@@ -1,0 +1,1077 @@
+<!-- web-admin/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Enigma | Админ-панель</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px 30px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .header h1 { color: #ffffff; font-size: 24px; }
+        .user-info { display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 40px; }
+        .user-info span { color: #ffffff; }
+        .logout-btn { background: linear-gradient(135deg, #f5576c, #f093fb); border: none; padding: 10px 20px; border-radius: 40px; color: white; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+        .logout-btn:hover { transform: translateY(-2px); }
+        .admin-layout { display: flex; gap: 20px; flex-wrap: wrap; }
+        .sidebar-menu { width: 280px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; }
+        .menu-btn { width: 100%; padding: 12px 16px; margin: 8px 0; background: rgba(255,255,255,0.1); border: none; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.3s; }
+        .menu-btn:hover { background: rgba(255,255,255,0.2); transform: translateX(5px); }
+        .menu-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .content-area { flex: 1; background: rgba(255,255,255,0.95); border-radius: 20px; padding: 25px; min-height: 600px; }
+        .content-header { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
+        .search-box { margin-bottom: 20px; }
+        .search-box input { width: 100%; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 12px; font-size: 14px; }
+        .user-list, .ticket-list, .bug-list, .log-list, .complaint-list { max-height: 500px; overflow-y: auto; }
+        .user-item, .ticket-item, .bug-item, .log-item, .complaint-item { background: #f5f5f5; border-radius: 12px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .user-info-text { flex: 1; }
+        .user-info-text strong { color: #1a1a2e; }
+        .user-info-text small { color: #888; }
+        .user-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .action-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 13px; transition: all 0.2s; }
+        .action-btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-danger { background: #f5576c; color: white; }
+        .btn-success { background: #43e97b; color: #000; }
+        .btn-info { background: #4facfe; color: white; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 20px; width: 600px; max-width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-content h3 { margin-bottom: 20px; color: #1a1a2e; }
+        .modal-content select, .modal-content textarea, .modal-content input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #e0e0e0; border-radius: 8px; }
+        .info-field { margin-bottom: 15px; }
+        .info-field label { font-weight: 600; display: block; margin-bottom: 5px; color: #1a1a2e; }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+        .ticket-status { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+        .status-open { background: #ffc107; color: #000; }
+        .status-replied { background: #4facfe; color: white; }
+        .status-closed { background: #888; color: white; }
+        .error { color: #f5576c; text-align: center; margin-top: 10px; }
+        .loading { text-align: center; color: #888; padding: 40px; }
+        .flex-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+        .chat-message { background: #e8e8e8; padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; }
+        .chat-message strong { color: #1a1a2e; }
+        .warning-info { background: #fff3cd; border: 1px solid #ffc107; border-radius: 12px; padding: 12px; margin-top: 15px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 16px; text-align: center; }
+        .stat-number { font-size: 32px; font-weight: bold; }
+        .stat-label { font-size: 12px; opacity: 0.9; margin-top: 5px; }
+        .punishment-item { background: #f5f5f5; padding: 12px; border-radius: 12px; margin-bottom: 10px; }
+        .punishment-resolved { border-left: 4px solid #43e97b; }
+        .punishment-active { border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2 style="text-align:center;">👑 Админ-панель Enigma</h2>
+            <input type="text" id="loginUsername" placeholder="Имя пользователя" onkeypress="if(event.key==='Enter') login()">
+            <input type="password" id="loginPassword" placeholder="Пароль" onkeypress="if(event.key==='Enter') login()">
+            <button onclick="login()" class="action-btn btn-primary" style="width:100%; justify-content:center;">Войти</button>
+            <div id="loginError" class="error"></div>
+        </div>
+    </div>
+    
+    <div id="adminPanel" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <h1>👑 Административная панель Enigma</h1>
+                <div class="user-info">
+                    <span id="adminUserName"></span>
+                    <span id="adminRoleBadge" class="role-badge"></span>
+                    <button class="logout-btn" onclick="logout()">Выйти</button>
+                </div>
+            </div>
+            <div class="admin-layout">
+                <div class="sidebar-menu">
+                    <button class="menu-btn active" onclick="showSection('users')">👥 Пользователи</button>
+                    <button class="menu-btn" onclick="showSection('tickets')">🎫 Обращения <span id="ticketsBadge" style="display:none; background:red; color:white; border-radius:50%; padding:2px 8px; margin-left:8px; font-size:11px;"></span></button>
+                    <button class="menu-btn" onclick="showSection('complaints')">⚠️ Жалобы <span id="complaintsBadge" style="display:none; background:red; color:white; border-radius:50%; padding:2px 8px; margin-left:8px; font-size:11px;"></span></button>
+                    <button class="menu-btn" onclick="showSection('bugs')">🐛 Баг-репорты</button>
+                    <button class="menu-btn" onclick="showSection('ratings')">⭐ Оценки</button>
+                    <button class="menu-btn" onclick="showSection('logs')">📋 Логи</button>
+                    <button class="menu-btn" onclick="showSection('account')">🚫 Управление аккаунтами</button>
+                    <button class="menu-btn" onclick="showSection('admins')">👑 Управление админами</button>
+                </div>
+                <div class="content-area">
+                    <div id="sectionTitle" class="content-header">👥 Пользователи</div>
+                    <div id="sectionContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="reasonModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="reasonModalTitle"></h3>
+            <select id="reasonSelect">
+                <option value="Нарушение правил сообщества">Нарушение правил сообщества</option>
+                <option value="Спам / Рассылка">Спам / Рассылка</option>
+                <option value="Оскорбительное поведение">Оскорбительное поведение</option>
+                <option value="Мошенничество / Обман">Мошенничество / Обман</option>
+                <option value="Другое">Другое</option>
+            </select>
+            <input type="text" id="reasonComment" placeholder="Комментарий (необязательно)">
+            <button onclick="confirmAction()" class="action-btn btn-primary">Подтвердить</button>
+            <button onclick="closeReasonModal()" class="action-btn" style="background:#888; color:white;">Отмена</button>
+        </div>
+    </div>
+    
+    <div id="userInfoModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="userInfoTitle"></h3>
+            <div id="userInfoContent"></div>
+            <button onclick="closeUserInfoModal()" class="action-btn" style="background:#888; color:white; margin-top:15px;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="userChatsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="userChatsTitle"></h3>
+            <div id="userChatsList" class="user-list"></div>
+            <button onclick="closeUserChatsModal()" class="action-btn" style="background:#888; margin-top:15px;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="chatMessagesModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="chatMessagesTitle"></h3>
+            <div id="chatMessagesList" style="max-height: 400px; overflow-y: auto;"></div>
+            <button onclick="closeChatMessagesModal()" class="action-btn" style="background:#888; margin-top:15px;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="ticketDetailModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="ticketDetailTitle"></h3>
+            <div id="ticketDetailContent" style="max-height: 400px; overflow-y: auto; margin-bottom:15px;"></div>
+            <textarea id="ticketReplyText" rows="3" placeholder="Ответ..." style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid #ddd;"></textarea>
+            <div class="flex-buttons">
+                <button onclick="sendTicketReply()" class="action-btn btn-primary">Ответить</button>
+                <button onclick="setTicketStatus('closed')" class="action-btn btn-success">✅ Закрыть</button>
+                <button onclick="escalateTicket()" class="action-btn btn-warning">⬆️ Эскалировать</button>
+            </div>
+            <button onclick="closeTicketDetailModal()" class="action-btn" style="background:#888; margin-top:10px;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="escalateModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>⬆️ Эскалация обращения</h3>
+            <select id="escalateSelect"></select>
+            <textarea id="escalateReason" rows="3" placeholder="Причина эскалации..."></textarea>
+            <button onclick="confirmEscalate()" class="action-btn btn-primary">Эскалировать</button>
+            <button onclick="closeEscalateModal()" class="action-btn" style="background:#888;">Отмена</button>
+        </div>
+    </div>
+
+    <div id="punishmentModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="punishmentModalTitle"></h3>
+            <div id="punishmentList" style="max-height: 400px; overflow-y: auto;"></div>
+            <button onclick="closePunishmentModal()" class="action-btn" style="background:#888; margin-top:15px;">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="complaintActionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="complaintActionTitle"></h3>
+            <div id="complaintActionContent"></div>
+            <div class="flex-buttons" style="margin-top: 15px;">
+                <button onclick="sendComplaintResolution('no_violation')" class="action-btn btn-primary">✅ Нарушений не выявлено</button>
+                <button onclick="sendComplaintResolution('warning')" class="action-btn btn-warning">⚠️ Выдано наказание</button>
+                <button onclick="sendComplaintResolution('block')" class="action-btn btn-danger">🚫 Пользователь заблокирован</button>
+                <button onclick="sendComplaintResolution('chat_deleted')" class="action-btn btn-danger">🗑️ Чат удален</button>
+            </div>
+            <button onclick="closeComplaintActionModal()" class="action-btn secondary" style="margin-top: 15px;">Отмена</button>
+        </div>
+    </div>
+
+    <div id="chatViewModal" class="modal" style="display: none;">
+        <div class="modal-content" style="width: 800px;">
+            <h3 id="chatViewTitle"></h3>
+            <div id="chatViewMessages" style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;"></div>
+            <div class="flex-buttons">
+                <button onclick="deleteFullChat()" class="action-btn btn-danger">🗑️ Удалить чат полностью</button>
+                <button onclick="closeChatViewModal()" class="action-btn secondary">Закрыть</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://dry-birds-return.loca.lt';
+        let currentUser = null;
+        let currentUserRole = null;
+        let currentSection = 'users';
+        let pendingAction = null;
+        let pendingUsername = null;
+        let currentTicketId = null;
+        let unreadTicketsCount = 0;
+        let unreadComplaintsCount = 0;
+        let currentComplaintId = null;
+        let currentComplaintType = null;
+        let currentComplaintTarget = null;
+        let currentComplaintFromUser = null;
+        let currentChatForView = null;
+        
+        function showModal(message, isError = false) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>${isError ? '❌ Ошибка' : '✅ Успешно'}</h3>
+                    <p>${escapeHtml(message)}</p>
+                    <button onclick="this.closest('.modal').remove()" class="action-btn btn-primary" style="margin-top:15px;">OK</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function showConfirmModal(message, onConfirm) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>⚠️ Подтверждение</h3>
+                    <p>${escapeHtml(message)}</p>
+                    <div class="flex-buttons" style="margin-top: 20px;">
+                        <button class="action-btn btn-success" data-action="confirm">✅ Да</button>
+                        <button class="action-btn btn-danger" data-action="cancel">❌ Нет</button>
+                    </div>
+                </div>
+            `;
+            modal.querySelector('[data-action="confirm"]').onclick = () => {
+                modal.remove();
+                if (onConfirm) onConfirm();
+            };
+            modal.querySelector('[data-action="cancel"]').onclick = () => modal.remove();
+            document.body.appendChild(modal);
+        }
+        
+        async function updateUnreadCounts() {
+            try {
+                const ticketsResponse = await fetch(`${API_URL}/api/admin/tickets`);
+                const tickets = await ticketsResponse.json();
+                unreadTicketsCount = tickets.filter(t => t.status !== 'closed').length;
+                const ticketsBadge = document.getElementById('ticketsBadge');
+                if (ticketsBadge) {
+                    ticketsBadge.style.display = unreadTicketsCount > 0 ? 'inline-block' : 'none';
+                    ticketsBadge.textContent = unreadTicketsCount > 99 ? '99+' : unreadTicketsCount;
+                }
+                
+                const complaintsResponse = await fetch(`${API_URL}/api/admin/complaints`);
+                const complaints = await complaintsResponse.json();
+                unreadComplaintsCount = complaints.filter(c => c.status === 'new').length;
+                const complaintsBadge = document.getElementById('complaintsBadge');
+                if (complaintsBadge) {
+                    complaintsBadge.style.display = unreadComplaintsCount > 0 ? 'inline-block' : 'none';
+                    complaintsBadge.textContent = unreadComplaintsCount > 99 ? '99+' : unreadComplaintsCount;
+                }
+            } catch(e) {}
+        }
+        
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/login`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const allowedRoles = ['owner', 'it_admin', 'admin', 'support'];
+                    if (!allowedRoles.includes(data.role)) {
+                        showModal('У вас нет доступа к админ-панели', true);
+                        return;
+                    }
+                    currentUser = username;
+                    currentUserRole = data.role;
+                    document.getElementById('adminUserName').innerHTML = `${data.display_name} (@${username})`;
+                    let roleText = { owner: 'Владелец продукта', it_admin: 'IT-администратор', admin: 'Администратор', support: 'Поддержка' }[data.role] || '';
+                    document.getElementById('adminRoleBadge').innerHTML = roleText;
+                    document.getElementById('loginModal').style.display = 'none';
+                    document.getElementById('adminPanel').style.display = 'block';
+                    loadUsers();
+                    updateUnreadCounts();
+                } else { 
+                    showModal(data.message, true);
+                }
+            } catch (err) { 
+                showModal('Ошибка подключения к серверу', true);
+            }
+        }
+        
+        function showSection(section) {
+            currentSection = section;
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            const titles = { 
+                users: '👥 Пользователи', 
+                tickets: '🎫 Обращения в поддержку', 
+                complaints: '⚠️ Жалобы', 
+                bugs: '🐛 Баг-репорты', 
+                ratings: '⭐ Оценки работы поддержки', 
+                logs: '📋 Логи действий', 
+                account: '🚫 Управление аккаунтами', 
+                admins: '👑 Управление администраторами'
+            };
+            document.getElementById('sectionTitle').innerHTML = titles[section];
+            if (section === 'users') loadUsers();
+            else if (section === 'tickets') loadTickets();
+            else if (section === 'complaints') loadComplaints();
+            else if (section === 'bugs') loadBugs();
+            else if (section === 'ratings') loadRatings();
+            else if (section === 'logs') loadLogs();
+            else if (section === 'account') loadAccountManagement();
+            else if (section === 'admins') loadAdmins();
+        }
+        
+        async function loadUsers() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/users`);
+            const users = await response.json();
+            const canEditRoles = (currentUserRole === 'owner' || currentUserRole === 'it_admin');
+            
+            document.getElementById('sectionContent').innerHTML = `
+                <div class="search-box"><input type="text" id="userSearch" placeholder="Поиск пользователей..."></div>
+                <div id="usersList" class="user-list"></div>
+            `;
+            
+            const renderUsers = (filter = '') => {
+                const filtered = users.filter(u => u.username !== 'System Support' && (u.username.toLowerCase().includes(filter) || (u.display_name || '').toLowerCase().includes(filter)));
+                document.getElementById('usersList').innerHTML = filtered.map(user => `
+                    <div class="user-item">
+                        <div class="user-info-text">
+                            <strong>${escapeHtml(user.display_name || user.username)}</strong><br>
+                            <small>@${user.username}</small><br>
+                            <small>Роль: ${getRoleName(user.role)}</small>
+                            ${user.is_verified ? '<span style="color:#43e97b;">✅ Верифицирован</span>' : '<span style="color:#888;">❌ Не верифицирован</span>'}
+                            ${user.has_active_warning ? '<span style="color:#ffc107;">⚠️ Активное предупреждение</span>' : ''}
+                        </div>
+                        <div class="user-actions">
+                            <button onclick="showUserInfo('${user.username}')" class="action-btn btn-info" title="Просмотр информации">ℹ️ Инфо</button>
+                            <button onclick="showUserChats('${user.username}')" class="action-btn btn-primary" title="Просмотр всех чатов пользователя">💬 Чаты</button>
+                            <button onclick="toggleVerify('${user.username}', ${user.is_verified})" class="action-btn btn-info" title="${user.is_verified ? 'Снять верификацию' : 'Верифицировать'}">✅ ${user.is_verified ? 'Снять верификацию' : 'Верифицировать'}</button>
+                            ${canEditRoles ? `<button onclick="showRoleSelect('${user.username}', '${user.role}')" class="action-btn btn-primary" title="Изменить роль">👑 Роль</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            };
+            renderUsers();
+            document.getElementById('userSearch').addEventListener('input', (e) => renderUsers(e.target.value.toLowerCase()));
+        }
+        
+        async function showUserChats(username) {
+            const response = await fetch(`${API_URL}/api/admin/user_chats/${username}`);
+            const data = await response.json();
+            
+            document.getElementById('userChatsTitle').innerHTML = `💬 Чаты пользователя @${username}`;
+            const container = document.getElementById('userChatsList');
+            
+            if (data.chats.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#888;">Нет чатов</div>';
+            } else {
+                container.innerHTML = data.chats.map(chat => `
+                    <div class="user-item" style="cursor:pointer;" onclick="showChatMessages('${username}', '${chat}')">
+                        <div><strong>${escapeHtml(chat)}</strong></div>
+                        <button class="action-btn btn-info" onclick="event.stopPropagation(); showChatMessages('${username}', '${chat}')">📖 Просмотр</button>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('userChatsModal').style.display = 'flex';
+        }
+        
+        async function showChatMessages(username, chatWith) {
+            const response = await fetch(`${API_URL}/api/admin/chat_messages/${username}?chat_with=${encodeURIComponent(chatWith)}`);
+            const messages = await response.json();
+            
+            document.getElementById('chatMessagesTitle').innerHTML = `💬 Чат @${username} → ${escapeHtml(chatWith)}`;
+            const container = document.getElementById('chatMessagesList');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#888;">Нет сообщений</div>';
+            } else {
+                container.innerHTML = messages.map(msg => `
+                    <div class="chat-message">
+                        <strong>${msg.from === username ? '👤 ' + username : '👥 ' + chatWith}:</strong>
+                        <p style="margin-top:5px;">${escapeHtml(msg.message)}</p>
+                        <small style="color:#888;">${new Date(msg.timestamp).toLocaleString()}</small>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('chatMessagesModal').style.display = 'flex';
+        }
+        
+        function closeUserChatsModal() { document.getElementById('userChatsModal').style.display = 'none'; }
+        function closeChatMessagesModal() { document.getElementById('chatMessagesModal').style.display = 'none'; }
+        
+        function showRoleSelect(username, currentRole) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>Изменение роли для @${username}</h3>
+                    <select id="roleSelect">
+                        <option value="user" ${currentRole === 'user' ? 'selected' : ''}>Пользователь</option>
+                        <option value="support" ${currentRole === 'support' ? 'selected' : ''}>Специалист поддержки</option>
+                        <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>Администратор</option>
+                        ${currentUserRole === 'owner' ? `<option value="it_admin" ${currentRole === 'it_admin' ? 'selected' : ''}>IT-администратор</option>` : ''}
+                        ${currentUserRole === 'owner' ? `<option value="owner" ${currentRole === 'owner' ? 'selected' : ''}>Владелец продукта</option>` : ''}
+                    </select>
+                    <button onclick="changeRole('${username}', document.getElementById('roleSelect').value)" class="action-btn btn-primary">Сохранить</button>
+                    <button onclick="this.closest('.modal').remove()" class="action-btn" style="background:#888;">Отмена</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        async function changeRole(username, newRole) {
+            await fetch(`${API_URL}/api/admin/set_role`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, role: newRole })
+            });
+            showModal(`Роль изменена на ${newRole}`);
+            document.querySelectorAll('.modal').forEach(m => m.remove());
+            loadUsers();
+        }
+        
+        async function loadAdmins() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/users`);
+            const users = await response.json();
+            const admins = users.filter(u => u.role === 'admin' || u.role === 'it_admin' || u.role === 'owner');
+            
+            document.getElementById('sectionContent').innerHTML = `
+                <h3 style="margin-bottom:15px;">👑 Список администраторов</h3>
+                <div id="adminsList" class="user-list">
+                    ${admins.map(admin => `
+                        <div class="user-item">
+                            <div>
+                                <strong>${escapeHtml(admin.display_name || admin.username)}</strong><br>
+                                <small>@${admin.username}</small><br>
+                                <span class="role-badge">${getRoleName(admin.role)}</span>
+                            </div>
+                            <div>
+                                ${currentUserRole === 'owner' && admin.username !== currentUser ? `<button onclick="removeAdmin('${admin.username}')" class="action-btn btn-danger">🗑️ Снять права</button>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <button onclick="showAddAdminPanel()" class="action-btn btn-primary" style="margin-top:15px;">➕ Добавить администратора</button>
+            `;
+        }
+        
+        async function showAddAdminPanel() {
+            const response = await fetch(`${API_URL}/api/admin/users`);
+            const users = await response.json();
+            const nonAdmins = users.filter(u => u.role !== 'admin' && u.role !== 'it_admin' && u.role !== 'owner' && u.username !== 'System Support');
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>➕ Добавить администратора</h3>
+                    <div class="user-list">
+                        ${nonAdmins.map(user => `
+                            <div class="user-item">
+                                <span><strong>${escapeHtml(user.display_name || user.username)}</strong><br><small>@${user.username}</small></span>
+                                <button onclick="makeAdmin('${user.username}')" class="action-btn btn-primary">Назначить</button>
+                            </div>
+                        `).join('')}
+                        ${nonAdmins.length === 0 ? '<div style="color:#888; text-align:center;">Нет пользователей для назначения</div>' : ''}
+                    </div>
+                    <button onclick="this.closest('.modal').remove()" class="action-btn" style="background:#888; margin-top:10px;">Закрыть</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        async function makeAdmin(username) {
+            await fetch(`${API_URL}/api/admin/add_admin`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            showModal(`Пользователь ${username} назначен администратором`);
+            document.querySelectorAll('.modal').forEach(m => m.remove());
+            loadAdmins();
+        }
+        
+        async function removeAdmin(username) {
+            showConfirmModal(`Снять права администратора с @${username}?`, async () => {
+                await fetch(`${API_URL}/api/admin/set_role`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, role: 'user' })
+                });
+                showModal(`Права сняты с ${username}`);
+                loadAdmins();
+            });
+        }
+        
+        async function toggleVerify(username, isCurrentlyVerified) {
+            const newStatus = isCurrentlyVerified ? 0 : 1;
+            await fetch(`${API_URL}/api/admin/verify`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, is_verified: newStatus })
+            });
+            showModal(isCurrentlyVerified ? `Верификация снята с ${username}` : `${username} верифицирован`);
+            loadUsers();
+        }
+        
+        async function showUserInfo(username) {
+            const response = await fetch(`${API_URL}/api/admin/user_full_info/${username}`);
+            const user = await response.json();
+            
+            let statusHtml = '';
+            let statusClass = '';
+            let statusIcon = '';
+            
+            if (user.account_status === 'deactivated') {
+                statusIcon = '⚠️';
+                statusClass = 'warning-info';
+                statusHtml = `
+                    <p><strong>Причина:</strong> ${escapeHtml(user.ban_reason || 'Не указана')}</p>
+                    <p><strong>Выдал:</strong> ${escapeHtml(user.warning_info?.issued_by || 'Система')}</p>
+                    <p><strong>Дата отключения:</strong> ${new Date(user.warning_info?.issued_at || user.created_at).toLocaleString()}</p>
+                `;
+            } else if (user.account_status === 'deleted') {
+                statusIcon = '⚠️';
+                statusClass = 'warning-info';
+                statusHtml = `
+                    <p><strong>Причина:</strong> ${escapeHtml(user.ban_reason || 'Не указана')}</p>
+                    <p><strong>Выдал:</strong> ${escapeHtml(user.warning_info?.issued_by || 'Система')}</p>
+                    <p><strong>Дата удаления:</strong> ${new Date(user.warning_info?.issued_at || user.created_at).toLocaleString()}</p>
+                `;
+            } else if (user.has_active_warning && user.warning_info) {
+                statusIcon = '⚠️';
+                statusClass = 'warning-info';
+                statusHtml = `
+                    <p><strong>⚠️ Активное предупреждение</strong></p>
+                    <p><strong>Причина:</strong> ${escapeHtml(user.warning_info.reason)}</p>
+                    <p><strong>Выдал:</strong> ${escapeHtml(user.warning_info.issued_by)}</p>
+                    <p><strong>Дата выдачи:</strong> ${new Date(user.warning_info.issued_at).toLocaleString()}</p>
+                `;
+            } else {
+                statusIcon = '✅';
+                statusClass = '';
+                statusHtml = `<p>Нет активных предупреждений</p>`;
+            }
+            
+            document.getElementById('userInfoTitle').innerHTML = `Информация о @${username}`;
+            document.getElementById('userInfoContent').innerHTML = `
+                <div class="info-field"><label>Отображаемое имя:</label><input type="text" id="editDisplayName" value="${escapeHtml(user.display_name)}"></div>
+                <div class="info-field"><label>Телефон:</label><input type="text" id="editPhone" value="${escapeHtml(user.phone || '')}"></div>
+                <div class="info-field"><label>Дата рождения:</label><input type="date" id="editBirthDate" value="${user.birth_date || ''}"></div>
+                <div class="info-field"><label>Дата регистрации:</label><div style="background:#e8e8e8; padding:8px; border-radius:8px;">${user.created_at || 'Неизвестно'}</div></div>
+                <div class="info-field"><label>Последний визит:</label><div style="background:#e8e8e8; padding:8px; border-radius:8px;">${user.last_seen || 'Неизвестно'}</div></div>
+                <div class="info-field"><label>Статус аккаунта:</label>
+                    <div class="${statusClass}" style="padding:12px; border-radius:12px; margin-top:5px;">
+                        <p><strong>${statusIcon} ${user.account_status === 'deactivated' ? 'Аккаунт деактивирован' : (user.account_status === 'deleted' ? 'Аккаунт удален' : (user.has_active_warning ? 'Есть активное предупреждение' : 'Аккаунт активен'))}</strong></p>
+                        ${statusHtml}
+                    </div>
+                </div>
+                <div class="flex-buttons" style="margin-top:15px;">
+                    <button onclick="showPunishmentHistory('${username}')" class="action-btn btn-info">📜 История наказаний</button>
+                </div>
+                <button onclick="saveUserInfo('${username}')" class="action-btn btn-primary" style="width:100%; margin-top:10px;">💾 Сохранить изменения</button>
+            `;
+            document.getElementById('userInfoModal').style.display = 'flex';
+        }
+        
+        async function showPunishmentHistory(username) {
+            const response = await fetch(`${API_URL}/api/punishments/${username}`);
+            const punishments = await response.json();
+            
+            document.getElementById('punishmentModalTitle').innerHTML = `📜 История наказаний @${username}`;
+            const container = document.getElementById('punishmentList');
+            
+            if (punishments.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#888;">Нет записей</div>';
+            } else {
+                container.innerHTML = punishments.map(p => `
+                    <div class="punishment-item ${p.resolved ? 'punishment-resolved' : 'punishment-active'}">
+                        <strong>${p.type === 'warning' ? '⚠️ Предупреждение' : (p.type === 'deactivation' ? '🔒 Деактивация' : '🗑️ Удаление')}</strong>
+                        <p><strong>Причина:</strong> ${escapeHtml(p.reason)}</p>
+                        <p><strong>Выдал:</strong> ${escapeHtml(p.issued_by)}</p>
+                        <p><strong>Дата:</strong> ${new Date(p.issued_at).toLocaleString()}</p>
+                        ${p.resolved ? `<p><strong>Снял:</strong> ${escapeHtml(p.resolved_by)}</p><p><strong>Дата снятия:</strong> ${new Date(p.resolved_at).toLocaleString()}</p>` : '<span style="color:#ffc107;">⚠️ Активно</span>'}
+                    </div>
+                `).join('');
+            }
+            document.getElementById('punishmentModal').style.display = 'flex';
+        }
+        
+        function closePunishmentModal() {
+            document.getElementById('punishmentModal').style.display = 'none';
+        }
+        
+        async function saveUserInfo(username) {
+            const displayName = document.getElementById('editDisplayName').value;
+            const phone = document.getElementById('editPhone').value;
+            const birthDate = document.getElementById('editBirthDate').value;
+            
+            await fetch(`${API_URL}/api/admin/change_display_name`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, new_display_name: displayName })
+            });
+            await fetch(`${API_URL}/api/admin/update_user_field`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, field: 'phone', value: phone })
+            });
+            await fetch(`${API_URL}/api/admin/update_user_field`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, field: 'birth_date', value: birthDate })
+            });
+            showModal('Информация обновлена');
+            closeUserInfoModal();
+            loadUsers();
+        }
+        
+        function closeUserInfoModal() { document.getElementById('userInfoModal').style.display = 'none'; }
+        
+        async function loadTickets() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/tickets`);
+            const tickets = await response.json();
+            updateUnreadCounts();
+            if (tickets.length === 0) { document.getElementById('sectionContent').innerHTML = '<div style="text-align:center;color:#888;">Нет активных обращений</div>'; return; }
+            document.getElementById('sectionContent').innerHTML = `<div id="ticketsList" class="ticket-list">${tickets.map(t => `
+                <div class="ticket-item" onclick="viewTicket('${t.id}')" style="cursor:pointer;">
+                    <div><strong>${escapeHtml(t.id)}</strong> - ${escapeHtml(t.title)}<br><small>От: ${escapeHtml(t.from_user)} | ${t.created_at}</small></div>
+                    <span class="ticket-status status-${t.status}">${t.status === 'open' ? 'Открыто' : (t.status === 'replied' ? 'Есть ответ' : 'Закрыто')}</span>
+                </div>`).join('')}</div>`;
+        }
+        
+        async function viewTicket(ticketId) {
+            currentTicketId = ticketId;
+            const response = await fetch(`${API_URL}/api/ticket/${ticketId}`);
+            const ticket = await response.json();
+            const messages = JSON.parse(ticket.messages || '[]');
+            const isClosed = ticket.status === 'closed' || ticket.archived === 1;
+            
+            document.getElementById('ticketDetailTitle').innerHTML = `${ticket.id} - ${escapeHtml(ticket.title)}`;
+            document.getElementById('ticketDetailContent').innerHTML = messages.map(msg => `
+                <div style="background:${msg.from === 'System Support' ? '#667eea' : '#f5f5f5'}; padding:12px; border-radius:12px; margin-bottom:10px;">
+                    <b style="color:${msg.from === 'System Support' ? 'white' : '#1a1a2e'};">${msg.from === 'System Support' ? 'Поддержка' : msg.from}:</b>
+                    <p style="color:${msg.from === 'System Support' ? 'white' : '#333'};">${escapeHtml(msg.message)}</p>
+                    <small style="color:${msg.from === 'System Support' ? 'rgba(255,255,255,0.7)' : '#888'};">${msg.timestamp}</small>
+                </div>
+            `).join('');
+            
+            const replyTextarea = document.getElementById('ticketReplyText');
+            const replyBtn = document.querySelector('#ticketDetailModal .flex-buttons');
+            
+            if (isClosed) {
+                replyTextarea.style.display = 'none';
+                if (replyBtn) replyBtn.style.display = 'none';
+                
+                const closedMsg = document.createElement('div');
+                closedMsg.style.cssText = 'background:#888; padding:12px; border-radius:12px; margin-top:10px; text-align:center; color:#fff;';
+                closedMsg.innerHTML = '📦 Обращение закрыто. Ответы невозможны.';
+                document.getElementById('ticketDetailContent').appendChild(closedMsg);
+            } else {
+                replyTextarea.style.display = 'block';
+                if (replyBtn) replyBtn.style.display = 'flex';
+                replyTextarea.value = '';
+            }
+            
+            document.getElementById('ticketDetailModal').style.display = 'flex';
+        }
+        
+        async function sendTicketReply() {
+            const reply = document.getElementById('ticketReplyText').value;
+            if (!reply.trim()) return;
+            
+            const response = await fetch(`${API_URL}/api/ticket/${currentTicketId}`);
+            const ticket = await response.json();
+            if (ticket.status === 'closed' || ticket.archived === 1) {
+                showModal('Обращение закрыто, ответ невозможен', true);
+                closeTicketDetailModal();
+                return;
+            }
+            
+            await fetch(`${API_URL}/api/admin/ticket_reply`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket_id: currentTicketId, reply })
+            });
+            showModal('Ответ отправлен');
+            viewTicket(currentTicketId);
+            loadTickets();
+        }
+        
+        async function setTicketStatus(status) {
+            await fetch(`${API_URL}/api/admin/ticket_status`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket_id: currentTicketId, status })
+            });
+            showModal(status === 'closed' ? 'Обращение отмечено как решённое' : 'Статус изменён');
+            closeTicketDetailModal();
+            loadTickets();
+            updateUnreadCounts();
+        }
+        
+        async function escalateTicket() {
+            const response = await fetch(`${API_URL}/api/admin/users`);
+            const users = await response.json();
+            const admins = users.filter(u => (u.role === 'it_admin' || u.role === 'owner') && u.username !== currentUser);
+            const select = document.getElementById('escalateSelect');
+            select.innerHTML = '<option value="">Выберите администратора</option>' + admins.map(a => `<option value="${a.username}">${a.display_name || a.username} (@${a.username})</option>`).join('');
+            document.getElementById('escalateModal').style.display = 'flex';
+        }
+        
+        async function confirmEscalate() {
+            const selectedAdmin = document.getElementById('escalateSelect').value;
+            const reason = document.getElementById('escalateReason').value;
+            if (!selectedAdmin) { showModal('Выберите администратора', true); return; }
+            await fetch(`${API_URL}/api/admin/escalate_ticket`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket_id: currentTicketId, escalated_to: selectedAdmin, reason: reason, escalated_by: currentUser })
+            });
+            closeEscalateModal();
+            showModal('Обращение эскалировано');
+            closeTicketDetailModal();
+            loadTickets();
+        }
+        
+        function closeEscalateModal() { document.getElementById('escalateModal').style.display = 'none'; }
+        function closeTicketDetailModal() { document.getElementById('ticketDetailModal').style.display = 'none'; currentTicketId = null; }
+        
+        // ========== ЖАЛОБЫ ==========
+        async function loadComplaints() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/complaints`);
+            const complaints = await response.json();
+            updateUnreadCounts();
+            if (complaints.length === 0) { document.getElementById('sectionContent').innerHTML = '<div style="text-align:center;color:#888;">Нет жалоб</div>'; return; }
+            
+            const userComplaints = complaints.filter(c => c.type === 'user');
+            const chatComplaints = complaints.filter(c => c.type === 'chat');
+            
+            document.getElementById('sectionContent').innerHTML = `
+                <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                    <button onclick="showComplaintType('user')" id="userComplaintsBtn" class="action-btn btn-primary">👥 Жалобы на пользователей (${userComplaints.length})</button>
+                    <button onclick="showComplaintType('chat')" id="chatComplaintsBtn" class="action-btn btn-primary">💬 Жалобы на чаты (${chatComplaints.length})</button>
+                </div>
+                <div id="complaintsList"></div>
+            `;
+            
+            window.showComplaintType = (type) => {
+                const filtered = complaints.filter(c => c.type === type);
+                const container = document.getElementById('complaintsList');
+                if (filtered.length === 0) {
+                    container.innerHTML = '<div style="text-align:center;color:#888;">Нет жалоб</div>';
+                    return;
+                }
+                container.innerHTML = filtered.map(c => `
+                    <div class="complaint-item">
+                        <div>
+                            <strong>Жалоба от ${escapeHtml(c.from_user)}</strong><br>
+                            <small>Тип: ${c.type === 'user' ? '👥 На пользователя' : '💬 На чат'}</small><br>
+                            <small>Цель: ${escapeHtml(c.target)}</small><br>
+                            <small>Причина: ${escapeHtml(c.reason)}</small><br>
+                            <small>Статус: ${c.status === 'new' ? '🟡 Новая' : '✅ Рассмотрена'}</small><br>
+                            <small>${c.timestamp}</small>
+                            ${c.details ? `<p style="margin-top:5px;">Подробности: ${escapeHtml(c.details)}</p>` : ''}
+                        </div>
+                        <div>
+                            ${c.status === 'new' ? `<button onclick="handleComplaint('${c.id}', '${c.type}', '${c.target}', '${c.from_user}')" class="action-btn btn-warning">🔍 Рассмотреть</button>` : ''}
+                            ${c.type === 'user' ? `<button onclick="showUserInfo('${c.target}')" class="action-btn btn-info">👤 Просмотр пользователя</button>` : ''}
+                            ${c.type === 'chat' ? `<button onclick="viewChatComplaint('${c.target}')" class="action-btn btn-info">💬 Просмотр чата</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            };
+            showComplaintType('user');
+        }
+        
+        async function handleComplaint(complaintId, type, target, fromUser) {
+            currentComplaintId = complaintId;
+            currentComplaintType = type;
+            currentComplaintTarget = target;
+            currentComplaintFromUser = fromUser;
+            
+            document.getElementById('complaintActionTitle').innerHTML = `🔍 Рассмотрение жалобы ${type === 'user' ? 'на пользователя' : 'на чат'} ${escapeHtml(target)}`;
+            document.getElementById('complaintActionModal').style.display = 'flex';
+        }
+        
+        async function sendComplaintResolution(action) {
+            let message = '';
+            let punishmentAction = null;
+            
+            if (currentComplaintType === 'user') {
+                switch(action) {
+                    case 'no_violation':
+                        message = `Уважаемый пользователь! Администрация сервиса рассмотрела Вашу жалобу на пользователя ${currentComplaintTarget}. Мы не выявили нарушений правил Сообщества, но возьмем данного пользователя на особый контроль. Благодарим за бдительность. С уважением, администрация Enigma`;
+                        break;
+                    case 'warning':
+                        message = `Уважаемый пользователь! Администрация сервиса рассмотрела Вашу жалобу на пользователя ${currentComplaintTarget}. Мы выявили нарушение правил Сообщества. Данному пользователю уже выдано наказание в соответствии с правилами выдачи наказаний. Благодарим за бдительность. С уважением, администрация Enigma`;
+                        punishmentAction = 'warning';
+                        break;
+                    case 'block':
+                        message = `Уважаемый пользователь! Администрация сервиса рассмотрела Вашу жалобу на пользователя ${currentComplaintTarget}. Данный пользователь заблокирован за нарушение правил сообщества. Благодарим за бдительность. С уважением, администрация Enigma`;
+                        break;
+                }
+            } else {
+                switch(action) {
+                    case 'no_violation':
+                        message = `Уважаемый пользователь! Администрация сервиса рассмотрела Вашу жалобу на чат ${currentComplaintTarget}. Мы не выявили нарушений правил Сообщества. Благодарим за бдительность. С уважением, администрация Enigma`;
+                        break;
+                    case 'chat_deleted':
+                        message = `Уважаемый пользователь! Администрация сервиса рассмотрела Вашу жалобу на чат ${currentComplaintTarget}. Данный чат удален за нарушение правил сообщества. Благодарим за бдительность. С уважением, администрация Enigma`;
+                        break;
+                }
+            }
+            
+            // Отправляем уведомление пользователю
+            await fetch(`${API_URL}/api/send_notification`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to_user: currentComplaintFromUser, message: message })
+            });
+            
+            // Закрываем жалобу
+            await fetch(`${API_URL}/api/admin/resolve_complaint`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ complaint_id: currentComplaintId })
+            });
+            
+            showModal('Решение отправлено пользователю');
+            closeComplaintActionModal();
+            loadComplaints();
+        }
+        
+        function closeComplaintActionModal() {
+            document.getElementById('complaintActionModal').style.display = 'none';
+            currentComplaintId = null;
+            currentComplaintType = null;
+            currentComplaintTarget = null;
+        }
+        
+        async function viewChatComplaint(chatId) {
+            currentChatForView = chatId;
+            const response = await fetch(`${API_URL}/api/get_messages/${encodeURIComponent(chatId)}?user=${currentUser}`);
+            const messages = await response.json();
+            
+            document.getElementById('chatViewTitle').innerHTML = `💬 Просмотр чата: ${escapeHtml(chatId)}`;
+            const container = document.getElementById('chatViewMessages');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#888;">Нет сообщений</div>';
+            } else {
+                container.innerHTML = messages.map(msg => `
+                    <div class="chat-message">
+                        <strong>${escapeHtml(msg.from_user)}:</strong>
+                        <p style="margin-top:5px;">${escapeHtml(msg.message)}</p>
+                        <small style="color:#888;">${new Date(msg.timestamp).toLocaleString()}</small>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('chatViewModal').style.display = 'flex';
+        }
+        
+        function deleteFullChat() {
+            showConfirmModal(`Удалить чат ${currentChatForView} без возможности восстановления?`, async () => {
+                await fetch(`${API_URL}/api/admin/delete_full_chat`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: currentChatForView })
+                });
+                showModal('Чат удален');
+                closeChatViewModal();
+                loadComplaints();
+            });
+        }
+        
+        function closeChatViewModal() {
+            document.getElementById('chatViewModal').style.display = 'none';
+            currentChatForView = null;
+        }
+        
+        async function loadBugs() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/bug_reports`);
+            const bugs = await response.json();
+            if (bugs.length === 0) { document.getElementById('sectionContent').innerHTML = '<div style="text-align:center;color:#888;">Нет баг-репортов</div>'; return; }
+            document.getElementById('sectionContent').innerHTML = `<div id="bugsList" class="bug-list">${bugs.map(b => `
+                <div class="bug-item">
+                    <div><strong>${escapeHtml(b.bug_type)}</strong><br><small>От: ${escapeHtml(b.from_user)} | ${b.timestamp}</small><p>${escapeHtml(b.message.substring(0, 100))}...</p></div>
+                    <div>
+                        <span class="ticket-status status-${b.priority === 'blocker' ? 'escalated' : 'open'}">${b.priority}</span>
+                        <select onchange="updateBugStatus(${b.id}, this.value)" style="margin-top:5px;">
+                            <option value="new" ${b.status === 'new' ? 'selected' : ''}>Новый</option>
+                            <option value="in_progress" ${b.status === 'in_progress' ? 'selected' : ''}>В работе</option>
+                            <option value="fixed" ${b.status === 'fixed' ? 'selected' : ''}>Исправлен</option>
+                            <option value="rejected" ${b.status === 'rejected' ? 'selected' : ''}>Отклонен</option>
+                        </select>
+                    </div>
+                </div>`).join('')}</div>`;
+        }
+        
+        async function updateBugStatus(bugId, status) {
+            await fetch(`${API_URL}/api/admin/bug_status`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bug_id: bugId, status })
+            });
+            loadBugs();
+        }
+        
+        async function loadRatings() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/ratings`);
+            const ratings = await response.json();
+            let avgRating = ratings.length ? (ratings.reduce((a,b)=>a+b.rating,0)/ratings.length).toFixed(1) : 0;
+            if (ratings.length === 0) { document.getElementById('sectionContent').innerHTML = '<div style="text-align:center;color:#888;">Нет оценок</div>'; return; }
+            document.getElementById('sectionContent').innerHTML = `
+                <div class="stats-grid"><div class="stat-card"><div class="stat-number">${avgRating}</div><div class="stat-label">Средняя оценка</div></div>
+                <div class="stat-card"><div class="stat-number">${ratings.length}</div><div class="stat-label">Всего оценок</div></div></div>
+                <div id="ratingsList">${ratings.map(r => `<div class="user-item"><div><strong>${escapeHtml(r.rated_by)}</strong><br><small>${r.timestamp}</small><div>Оценка: ${'⭐'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>${r.comment ? `<p>${escapeHtml(r.comment)}</p>` : ''}</div></div>`).join('')}</div>`;
+        }
+        
+        async function loadLogs() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/logs`);
+            const logs = await response.json();
+            document.getElementById('sectionContent').innerHTML = `<div class="search-box"><input type="text" id="logsSearch" placeholder="Поиск..."></div><div id="logsList" class="log-list"></div>`;
+            const renderLogs = (filter = '') => {
+                const filtered = logs.filter(l => l.username.toLowerCase().includes(filter) || l.action.toLowerCase().includes(filter) || l.target.toLowerCase().includes(filter));
+                document.getElementById('logsList').innerHTML = filtered.map(l => `<div class="log-item"><strong>${escapeHtml(l.username)}</strong> - ${escapeHtml(l.action)}<br><small>Цель: ${escapeHtml(l.target)}</small><br><small>${l.details ? escapeHtml(l.details) : ''}</small><br><small>${l.timestamp}</small></div>`).join('');
+            };
+            renderLogs();
+            document.getElementById('logsSearch').addEventListener('input', (e) => renderLogs(e.target.value.toLowerCase()));
+        }
+        
+        async function loadAccountManagement() {
+            document.getElementById('sectionContent').innerHTML = '<div class="loading">Загрузка...</div>';
+            const response = await fetch(`${API_URL}/api/admin/users`);
+            const users = await response.json();
+            document.getElementById('sectionContent').innerHTML = `
+                <div class="search-box"><input type="text" id="accountSearch" placeholder="Поиск..."></div>
+                <div id="accountList" class="user-list"></div>
+            `;
+            
+            const renderAccounts = (filter = '') => {
+                const filtered = users.filter(u => u.username !== 'System Support' && u.username !== currentUser && u.role !== 'owner' && u.username.toLowerCase().includes(filter));
+                document.getElementById('accountList').innerHTML = filtered.map(user => {
+                    let statusText = '', actionButtons = '';
+                    
+                    if (user.account_status === 'deactivated') {
+                        statusText = '🔴 Деактивирован';
+                        actionButtons = `<button onclick="restoreAccount('${user.username}')" class="action-btn btn-success">🔄 Восстановить</button>`;
+                    }
+                    else if (user.account_status === 'deleted') {
+                        statusText = '⚫ Удален';
+                        actionButtons = `
+                            <button onclick="showUserInfo('${user.username}')" class="action-btn btn-info">ℹ️ Инфо</button>
+                            <button onclick="restoreAccount('${user.username}')" class="action-btn btn-success">🔄 Восстановить</button>
+                        `;
+                    }
+                    else {
+                        statusText = '🟢 Активен';
+                        actionButtons = `
+                            <button onclick="openWarningModal('${user.username}')" class="action-btn btn-warning">⚠️ Выдать предупреждение</button>
+                            <button onclick="openDeactivateModal('${user.username}')" class="action-btn btn-warning">🔒 Деактивировать</button>
+                            <button onclick="openDeleteModal('${user.username}')" class="action-btn btn-danger">🗑️ Удалить</button>
+                        `;
+                    }
+                    
+                    return `
+                        <div class="user-item">
+                            <div class="user-info-text">
+                                <strong>${escapeHtml(user.display_name || user.username)}</strong><br>
+                                <small>@${user.username}</small><br>
+                                <span>${statusText}</span>
+                                ${user.has_active_warning ? '<br><span style="color:#ffc107;">⚠️ Активное предупреждение</span>' : ''}
+                            </div>
+                            <div class="user-actions">
+                                ${actionButtons}
+                                ${user.has_active_warning ? `<button onclick="resolveWarning('${user.username}')" class="action-btn btn-success">✅ Снять предупреждение</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            };
+            
+            renderAccounts();
+            document.getElementById('accountSearch').addEventListener('input', (e) => renderAccounts(e.target.value.toLowerCase()));
+        }
+        
+        function openWarningModal(username) { pendingAction = 'warning'; pendingUsername = username; document.getElementById('reasonModalTitle').innerHTML = `⚠️ Выдача предупреждения @${username}`; document.getElementById('reasonModal').style.display = 'flex'; }
+        function openDeactivateModal(username) { pendingAction = 'deactivate'; pendingUsername = username; document.getElementById('reasonModalTitle').innerHTML = `🔒 Деактивация аккаунта @${username}`; document.getElementById('reasonModal').style.display = 'flex'; }
+        function openDeleteModal(username) { pendingAction = 'delete'; pendingUsername = username; document.getElementById('reasonModalTitle').innerHTML = `🗑️ Удаление аккаунта @${username}`; document.getElementById('reasonModal').style.display = 'flex'; }
+        
+        async function confirmAction() {
+            const reason = document.getElementById('reasonSelect').value;
+            const comment = document.getElementById('reasonComment').value;
+            const fullReason = comment ? `${reason}: ${comment}` : reason;
+            if (pendingAction === 'warning') {
+                await fetch(`${API_URL}/api/admin/issue_warning`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: pendingUsername, reason: fullReason, issued_by: currentUser }) });
+                showModal(`Предупреждение выдано пользователю ${pendingUsername}`);
+            } else {
+                await fetch(`${API_URL}/api/admin/manage_account`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: pendingUsername, action: pendingAction, reason: fullReason }) });
+                showModal(`Аккаунт ${pendingAction === 'deactivate' ? 'деактивирован' : 'удален'}`);
+            }
+            closeReasonModal();
+            if (currentSection === 'account') loadAccountManagement();
+        }
+        
+        async function resolveWarning(username) {
+            showConfirmModal(`Снять предупреждение с ${username}?`, async () => {
+                await fetch(`${API_URL}/api/admin/resolve_warning`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, resolved_by: currentUser }) });
+                showModal(`Предупреждение снято с ${username}`);
+                loadAccountManagement();
+            });
+        }
+        
+        async function restoreAccount(username) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>⚠️ Восстановление аккаунта</h3>
+                    <p>Вы уверены, что хотите восстановить аккаунт <strong>@${escapeHtml(username)}</strong>?</p>
+                    <p style="color: #888; margin-top: 10px;">После восстановления пользователь сможет войти в систему.</p>
+                    <div class="flex-buttons" style="margin-top: 20px;">
+                        <button class="action-btn btn-success" data-action="confirm">✅ Да, восстановить</button>
+                        <button class="action-btn btn-danger" data-action="cancel">❌ Отмена</button>
+                    </div>
+                </div>
+            `;
+            modal.querySelector('[data-action="confirm"]').onclick = async () => {
+                modal.remove();
+                try {
+                    const response = await fetch(`${API_URL}/api/admin/restore_account`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, admin: currentUser })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        showModal(data.message);
+                        loadAccountManagement();
+                    } else {
+                        showModal('Ошибка: ' + data.message, true);
+                    }
+                } catch (err) {
+                    showModal('Ошибка при восстановлении аккаунта', true);
+                }
+            };
+            modal.querySelector('[data-action="cancel"]').onclick = () => modal.remove();
+            document.body.appendChild(modal);
+        }
+        
+        function getRoleName(role) { 
+            const roles = { 'owner': 'Владелец продукта', 'it_admin': 'IT-администратор', 'admin': 'Администратор', 'support': 'Поддержка', 'user': 'Пользователь' };
+            return roles[role] || role; 
+        }
+        
+        function closeReasonModal() { document.getElementById('reasonModal').style.display = 'none'; document.getElementById('reasonComment').value = ''; pendingAction = null; pendingUsername = null; }
+        function logout() { location.reload(); }
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    </script>
+</body>
+</html>
