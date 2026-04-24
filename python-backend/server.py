@@ -111,7 +111,7 @@ async def init_db_pool():
             
             # Таблица groups
             await cur.execute("""
-                CREATE TABLE IF NOT EXISTS groups (
+                CREATE TABLE IF NOT EXISTS `groups` (
                     id VARCHAR(50) PRIMARY KEY,
                     name VARCHAR(255),
                     owner VARCHAR(255),
