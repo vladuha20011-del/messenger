@@ -357,24 +357,27 @@ async def api_send_group(request):
                 if from_user not in members:
                     return cors_response({"status": "error", "message": "Вы не участник этой группы"})
                 
+                # Сохраняем сообщение
                 await cur.execute("""
                     INSERT INTO messages (from_user, to_user, message, file_type, file_data, timestamp, delivered, read_status) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (from_user, group_id, text, file_type, file_data, datetime.now(), 1, 0))
                 msg_id = cur.lastrowid
                 
+                # Рассылаем всем участникам
                 for member in members:
-                    if member != from_user and member in active_connections:
+                    if member in active_connections:
                         try:
                             await active_connections[member].send_json({
-                                "type": "group_message",
+                                "type": "new_message",
                                 "id": msg_id,
-                                "group_id": group_id,
                                 "from": from_user,
                                 "text": text,
                                 "file_type": file_type,
                                 "file_data": file_data,
-                                "timestamp": datetime.now().isoformat()
+                                "timestamp": datetime.now().isoformat(),
+                                "is_group": True,
+                                "group_id": group_id
                             })
                         except:
                             pass
