@@ -5,29 +5,13 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "publish": "electron-builder --win --publish always"
+    "pack": "electron-packager . EnigmaMessenger --platform=win32 --arch=x64 --out=release --overwrite"
   },
   "author": "Enigma Team",
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.2.0",
-    "electron-builder": "^24.9.1"
-  },
-  "dependencies": {
-    "electron-updater": "^6.3.9"
-  },
-  "build": {
-    "appId": "com.enigma.messenger",
-    "productName": "Enigma Messenger",
-    "publish": {
-      "provider": "github",
-      "owner": "vladuha20011-del",
-      "repo": "messenger",
-      "releaseType": "release"
-    },
-    "win": {
-      "target": "nsis"
-    }
+    "electron-builder": "^24.9.1",
+    "electron-packager": "^17.1.2"
   }
 }
