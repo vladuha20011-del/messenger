@@ -269,12 +269,27 @@ async def api_get_messages(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("""
-                    SELECT id, from_user, message, file_type, file_data, timestamp, delivered, read_status 
-                    FROM messages 
-                    WHERE ((from_user=%s AND to_user=%s) OR (from_user=%s AND to_user=%s)) AND deleted=0
-                    ORDER BY timestamp
-                """, (current_user, chat_id, chat_id, current_user))
+                # Проверяем, является ли chat_id группой
+                await cur.execute("SELECT id FROM `groups` WHERE id=%s", (chat_id,))
+                is_group = await cur.fetchone()
+                
+                if is_group:
+                    # Для группы получаем все сообщения, где to_user = group_id
+                    await cur.execute("""
+                        SELECT id, from_user, message, file_type, file_data, timestamp, delivered, read_status 
+                        FROM messages 
+                        WHERE to_user=%s AND deleted=0
+                        ORDER BY timestamp
+                    """, (chat_id,))
+                else:
+                    # Для личного чата
+                    await cur.execute("""
+                        SELECT id, from_user, message, file_type, file_data, timestamp, delivered, read_status 
+                        FROM messages 
+                        WHERE ((from_user=%s AND to_user=%s) OR (from_user=%s AND to_user=%s)) AND deleted=0
+                        ORDER BY timestamp
+                    """, (current_user, chat_id, chat_id, current_user))
+                
                 messages = await cur.fetchall()
                 
                 return cors_response([{
@@ -285,6 +300,44 @@ async def api_get_messages(request):
                 } for m in messages])
     except Exception as e:
         print(f"Get messages error: {e}")
+        return cors_response([])
+
+async def api_get_group_messages(request):
+    try:
+        group_id = request.match_info['group_id']
+        current_user = request.query.get('user', '')
+        
+        async with db_pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                # Проверяем, что пользователь в группе
+                await cur.execute("SELECT members FROM `groups` WHERE id=%s", (group_id,))
+                group = await cur.fetchone()
+                if not group:
+                    return cors_response([])
+                
+                members = json.loads(group[0])
+                if current_user not in members:
+                    return cors_response([])
+                
+                # Получаем все сообщения группы
+                await cur.execute("""
+                    SELECT id, from_user, message, file_type, file_data, timestamp, delivered, read_status 
+                    FROM messages 
+                    WHERE to_user=%s AND deleted=0
+                    ORDER BY timestamp
+                    LIMIT 1000
+                """, (group_id,))
+                
+                messages = await cur.fetchall()
+                
+                return cors_response([{
+                    "id": m[0], "from_user": m[1], "message": m[2],
+                    "file_type": m[3] or '', "file_data": m[4] or '',
+                    "timestamp": m[5].isoformat() if m[5] else '',
+                    "delivered": m[6], "read_status": m[7]
+                } for m in messages])
+    except Exception as e:
+        print(f"Get group messages error: {e}")
         return cors_response([])
 
 async def api_send(request):
@@ -357,30 +410,33 @@ async def api_send_group(request):
                 if from_user not in members:
                     return cors_response({"status": "error", "message": "Вы не участник этой группы"})
                 
-                # Сохраняем сообщение
+                # Сохраняем сообщение в БД
                 await cur.execute("""
                     INSERT INTO messages (from_user, to_user, message, file_type, file_data, timestamp, delivered, read_status) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (from_user, group_id, text, file_type, file_data, datetime.now(), 1, 0))
                 msg_id = cur.lastrowid
                 
-                # Рассылаем всем участникам
+                # Формируем данные для отправки
+                message_data = {
+                    "type": "new_message",
+                    "id": msg_id,
+                    "from": from_user,
+                    "text": text,
+                    "file_type": file_type,
+                    "file_data": file_data,
+                    "timestamp": datetime.now().isoformat(),
+                    "is_group": True,
+                    "group_id": group_id
+                }
+                
+                # Отправляем всем участникам группы
                 for member in members:
-                    if member in active_connections:
+                    if member != from_user and member in active_connections:
                         try:
-                            await active_connections[member].send_json({
-                                "type": "new_message",
-                                "id": msg_id,
-                                "from": from_user,
-                                "text": text,
-                                "file_type": file_type,
-                                "file_data": file_data,
-                                "timestamp": datetime.now().isoformat(),
-                                "is_group": True,
-                                "group_id": group_id
-                            })
-                        except:
-                            pass
+                            await active_connections[member].send_json(message_data)
+                        except Exception as e:
+                            print(f"Failed to send to {member}: {e}")
                 
                 return cors_response({"status": "success", "id": msg_id})
     except Exception as e:
@@ -1708,6 +1764,7 @@ app.router.add_post('/api/update_avatar', api_update_avatar)
 app.router.add_get('/api/contacts/{username}', api_get_contacts)
 app.router.add_get('/api/search_users', api_search_users)
 app.router.add_get('/api/get_messages/{chat_id}', api_get_messages)
+app.router.add_get('/api/get_group_messages/{group_id}', api_get_group_messages)
 app.router.add_post('/api/send', api_send)
 app.router.add_post('/api/send_group', api_send_group)
 app.router.add_post('/api/edit_message', api_edit_message)
