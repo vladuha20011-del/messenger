@@ -882,72 +882,77 @@
             else { document.getElementById('regError').innerText = data.message; }
         }
         
-        function connectWebSocket() {
-            ws = new WebSocket(`ws://localhost:8080/ws?username=${currentUser}`);
-            ws.onopen = () => console.log('WebSocket connected');
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === 'new_message') {
-                    const sender = data.from === 'System Support' ? '🛡️ Уведомления' : data.from;
-                    if (!messages[sender]) messages[sender] = [];
-                    messages[sender].push({ id: data.id, text: data.text, time: new Date(data.timestamp).toLocaleTimeString(), isMe: false, delivered: true, read: false, file_type: data.file_type, file_data: data.file_data });
-                    if (!chats[sender]) {
-                        chats[sender] = { username: sender, lastMessage: data.text.substring(0, 50), avatar: '', unread: 1 };
-                    } else {
-                        chats[sender].lastMessage = data.text.substring(0, 50);
-                        chats[sender].unread = (chats[sender].unread || 0) + 1;
-                    }
-                    if (currentChat === sender) {
-                        loadMessages(currentChat);
-                        if (chats[sender]) chats[sender].unread = 0;
-                    }
-                    renderChats();
-                } else if (data.type === 'group_message') {
-                    if (!messages[data.group_id]) messages[data.group_id] = [];
-                    messages[data.group_id].push({ id: data.id, text: data.text, time: new Date(data.timestamp).toLocaleTimeString(), isMe: data.from === currentUser, delivered: true, read: false, file_type: data.file_type, file_data: data.file_data });
-                    if (!chats[data.group_id]) {
-                        const groupInfo = groups[data.group_id];
-                        chats[data.group_id] = { username: groupInfo?.name || data.group_id, lastMessage: data.text.substring(0, 50), avatar: '', unread: 1, isGroup: true };
-                    } else {
-                        chats[data.group_id].lastMessage = data.text.substring(0, 50);
-                        chats[data.group_id].unread = (chats[data.group_id].unread || 0) + 1;
-                    }
-                    if (currentChat === data.group_id) {
-                        renderMessages();
-                        if (chats[data.group_id]) chats[data.group_id].unread = 0;
-                    }
-                    renderChats();
-                } else if (data.type === 'message_read') {
-                    for (let chat in messages) {
-                        const msg = messages[chat].find(m => m.id === data.message_id);
-                        if (msg) msg.read = true;
-                    }
-                    if (currentChat) renderMessages();
-                } else if (data.type === 'avatar_updated') {
-                    if (chats[data.username]) chats[data.username].avatar = data.avatar;
-                    renderChats();
-                    if (currentChat === data.username) updateChatHeader(data.username);
-                } else if (data.type === 'verification_changed') {
-                    if (data.is_verified) document.getElementById('menuVerifiedBadge').innerHTML = '✅';
-                    else document.getElementById('menuVerifiedBadge').innerHTML = '';
-                    renderChats();
-                } else if (data.type === 'profile_updated') {
-                    userData.display_name = data.display_name;
-                    document.getElementById('menuDisplayName').innerHTML = data.display_name;
-                } else if (data.type === 'ticket_reply') { showModal(`Новый ответ в обращении ${data.ticket_id}`); }
-                else if (data.type === 'show_rating') { pendingTicketId = data.ticket_id; document.getElementById('ratingModal').style.display = 'flex'; }
-                else if (data.type === 'warning_issued') { showModal(data.message); }
-                else if (data.type === 'account_deactivated') { 
-                    showModal(data.message);
-                    showDeactivatedModal(data.reason);
+function connectWebSocket() {
+    ws = new WebSocket(`ws://186.246.2.145:8080/ws?username=${currentUser}`);
+    ws.onopen = () => console.log('WebSocket connected');
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_message') {
+            if (data.is_group) {
+                const groupId = data.group_id;
+                if (!messages[groupId]) messages[groupId] = [];
+                messages[groupId].push({
+                    id: data.id,
+                    text: data.text,
+                    time: new Date(data.timestamp).toLocaleTimeString(),
+                    isMe: data.from === currentUser,
+                    delivered: true,
+                    read: false,
+                    file_type: data.file_type,
+                    file_data: data.file_data
+                });
+                if (!chats[groupId]) {
+                    chats[groupId] = {
+                        username: groupId,
+                        lastMessage: data.text.substring(0, 50),
+                        avatar: '',
+                        unread: 1,
+                        isGroup: true
+                    };
+                } else {
+                    chats[groupId].lastMessage = data.text.substring(0, 50);
+                    chats[groupId].unread = (chats[groupId].unread || 0) + 1;
                 }
-                else if (data.type === 'account_deleted') { 
-                    showModal(data.message);
+                if (currentChat === groupId) {
+                    renderMessages();
+                    if (chats[groupId]) chats[groupId].unread = 0;
                 }
-                else if (data.type === 'account_restored') { showModal('Ваш аккаунт восстановлен!'); location.reload(); }
-            };
-            ws.onclose = () => setTimeout(connectWebSocket, 3000);
+                renderChats();
+                return;
+            }
+            
+            const sender = data.from === 'System Support' ? '🛡️ Уведомления' : data.from;
+            if (!messages[sender]) messages[sender] = [];
+            messages[sender].push({
+                id: data.id,
+                text: data.text,
+                time: new Date(data.timestamp).toLocaleTimeString(),
+                isMe: false,
+                delivered: true,
+                read: false,
+                file_type: data.file_type,
+                file_data: data.file_data
+            });
+            if (!chats[sender]) {
+                chats[sender] = {
+                    username: sender,
+                    lastMessage: data.text.substring(0, 50),
+                    avatar: '',
+                    unread: 1
+                };
+            } else {
+                chats[sender].lastMessage = data.text.substring(0, 50);
+                chats[sender].unread = (chats[sender].unread || 0) + 1;
+            }
+            if (currentChat === sender) {
+                renderMessages();
+                if (chats[sender]) chats[sender].unread = 0;
+            }
+            renderChats();
         }
+    };
+    ws.onclose = () => setTimeout(connectWebSocket, 3000);
+}
         
         async function loadChats() {
             const response = await fetch(`${API_URL}/api/contacts/${currentUser}`);
