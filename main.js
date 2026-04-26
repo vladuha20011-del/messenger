@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Tray, Menu, shell, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
+const { app, BrowserWindow, Tray, Menu, shell, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { spawn, execSync } = require('child_process'); // execSync добавляем сюда
 const fs = require('fs');
@@ -208,7 +209,18 @@ async function createWindow() {
     });
     
     // Открыть DevTools для отладки
-    mainWindow.webContents.openDevTools();
+   // mainWindow.webContents.openDevTools();
+
+ // Автообновление
+    autoUpdater.checkForUpdatesAndNotify();
+    
+    autoUpdater.on('update-available', (info) => {
+        mainWindow.webContents.send('update_available', info);
+    });
+    
+    autoUpdater.on('update-downloaded', (info) => {
+        mainWindow.webContents.send('update_downloaded', info);
+    });
 }
 
 // ========== СОЗДАНИЕ ТРЕЯ ==========
@@ -234,6 +246,14 @@ function createTray() {
         tray.on('click', function() { if (mainWindow) mainWindow.show(); });
     }
 }
+
+function installUpdate() {
+    autoUpdater.quitAndInstall();
+}
+
+ipcMain.on('restart-app', () => {
+    installUpdate();
+});
 
 // ========== ЗАПУСК ==========
 app.whenReady().then(async function() {
