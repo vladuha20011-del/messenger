@@ -348,7 +348,7 @@ async def api_send_group(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT members, owner FROM groups WHERE id=%s", (group_id,))
+                await cur.execute("SELECT members, owner FROM `groups` WHERE id=%s", (group_id,))
                 group = await cur.fetchone()
                 if not group:
                     return cors_response({"status": "error", "message": "Группа не найдена"})
@@ -468,7 +468,7 @@ async def api_get_groups(request):
     try:
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT id, name, owner, members FROM groups")
+                await cur.execute("SELECT id, name, owner, members FROM `groups`")
                 groups = await cur.fetchall()
                 return cors_response([{"id": g[0], "name": g[1], "owner": g[2], "members": g[3]} for g in groups])
     except Exception as e:
@@ -487,7 +487,7 @@ async def api_create_group(request):
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("""
-                    INSERT INTO groups (id, name, owner, created_at, members) 
+                    INSERT INTO `groups` (id, name, owner, created_at, members) 
                     VALUES (%s, %s, %s, %s, %s)
                 """, (group_id, name, owner, datetime.now(), members_json))
                 await add_log(owner, 'create_group', group_id, f'Создал группу {name}')
@@ -505,14 +505,14 @@ async def api_rename_group(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT owner FROM groups WHERE id=%s", (group_id,))
+                await cur.execute("SELECT owner FROM `groups` WHERE id=%s", (group_id,))
                 group = await cur.fetchone()
                 if not group:
                     return cors_response({"status": "error", "message": "Группа не найдена"})
                 if current_user != group[0]:
                     return cors_response({"status": "error", "message": "Только создатель группы может переименовывать её"})
                 
-                await cur.execute("UPDATE groups SET name=%s WHERE id=%s", (new_name, group_id))
+                await cur.execute("UPDATE `groups` SET name=%s WHERE id=%s", (new_name, group_id))
                 await add_log(current_user, 'rename_group', group_id, f'Переименовал в {new_name}')
                 return cors_response({"status": "success"})
     except Exception as e:
@@ -528,7 +528,7 @@ async def api_add_group_member(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT members, owner FROM groups WHERE id=%s", (group_id,))
+                await cur.execute("SELECT members, owner FROM `groups` WHERE id=%s", (group_id,))
                 group = await cur.fetchone()
                 if not group:
                     return cors_response({"status": "error", "message": "Группа не найдена"})
@@ -538,7 +538,7 @@ async def api_add_group_member(request):
                 members = json.loads(group[0])
                 if username not in members:
                     members.append(username)
-                    await cur.execute("UPDATE groups SET members=%s WHERE id=%s", (json.dumps(members), group_id))
+                    await cur.execute("UPDATE `groups` SET members=%s WHERE id=%s", (json.dumps(members), group_id))
                     await add_log(current_user, 'add_group_member', group_id, f'Добавил {username}')
                 return cors_response({"status": "success"})
     except Exception as e:
@@ -554,7 +554,7 @@ async def api_remove_group_member(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT members, owner FROM groups WHERE id=%s", (group_id,))
+                await cur.execute("SELECT members, owner FROM `groups` WHERE id=%s", (group_id,))
                 group = await cur.fetchone()
                 if not group:
                     return cors_response({"status": "error", "message": "Группа не найдена"})
@@ -564,7 +564,7 @@ async def api_remove_group_member(request):
                 members = json.loads(group[0])
                 if username in members and username != group[1]:
                     members.remove(username)
-                    await cur.execute("UPDATE groups SET members=%s WHERE id=%s", (json.dumps(members), group_id))
+                    await cur.execute("UPDATE `groups` SET members=%s WHERE id=%s", (json.dumps(members), group_id))
                     await add_log(current_user, 'remove_group_member', group_id, f'Удалил {username}')
                 return cors_response({"status": "success"})
     except Exception as e:
@@ -578,7 +578,7 @@ async def api_leave_group(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT members, owner FROM groups WHERE id=%s", (group_id,))
+                await cur.execute("SELECT members, owner FROM `groups` WHERE id=%s", (group_id,))
                 group = await cur.fetchone()
                 if not group:
                     return cors_response({"status": "error", "message": "Группа не найдена"})
@@ -586,7 +586,7 @@ async def api_leave_group(request):
                 members = json.loads(group[0])
                 if username in members:
                     members.remove(username)
-                    await cur.execute("UPDATE groups SET members=%s WHERE id=%s", (json.dumps(members), group_id))
+                    await cur.execute("UPDATE `groups` SET members=%s WHERE id=%s", (json.dumps(members), group_id))
                     await add_log(username, 'leave_group', group_id, 'Покинул группу')
                 return cors_response({"status": "success"})
     except Exception as e:
@@ -599,7 +599,7 @@ async def api_get_group_info(request):
         
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT id, name, owner, members, created_at FROM groups WHERE id=%s", (group_id,))
+                await cur.execute("SELECT id, name, owner, members, created_at FROM `groups` WHERE id=%s", (group_id,))
                 group = await cur.fetchone()
                 if group:
                     members = json.loads(group[3])
