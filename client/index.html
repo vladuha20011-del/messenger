@@ -497,19 +497,27 @@
         // Автообновление
         let currentVersion = "1.0.0";
         
-        function showUpdateModal(updateData) {
-            const modal = document.getElementById('updateModal');
-            const message = document.getElementById('updateMessage');
-            message.innerHTML = `Версия ${updateData.version} уже доступна!<br>${updateData.release_notes || ''}<br><br>Хотите обновиться?`;
-            modal.style.display = 'flex';
-            document.getElementById('updateNowBtn').onclick = () => {
-                window.open(updateData.download_url, '_blank');
-                modal.style.display = 'none';
-            };
-            document.getElementById('updateLaterBtn').onclick = () => {
-                modal.style.display = 'none';
-            };
+function showUpdateModal(updateData) {
+    const modal = document.getElementById('updateModal');
+    const message = document.getElementById('updateMessage');
+    message.innerHTML = `Версия ${updateData.version} уже доступна!<br>${updateData.release_notes || ''}<br><br>Хотите обновиться?`;
+    modal.style.display = 'flex';
+    
+    document.getElementById('updateNowBtn').onclick = () => {
+        modal.style.display = 'none';
+        if (window.electronAPI) {
+            // В Electron — перезапуск с установкой
+            window.electronAPI.restart();
+        } else {
+            // В браузере — открыть ссылку
+            window.open(updateData.download_url, '_blank');
         }
+    };
+    
+    document.getElementById('updateLaterBtn').onclick = () => {
+        modal.style.display = 'none';
+    };
+}
         
         // Функции контекстного меню и другие вспомогательные функции
         let contextMenu = null;
@@ -1981,6 +1989,38 @@ function renderMessages() {
         window.showFilteredItems = showFilteredItems;
         window.closeFilteredItemsModal = closeFilteredItemsModal;
         window.openMessageFromFilter = openMessageFromFilter;
+        
+        // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ПРИ ЗАПУСКЕ ==========
+setTimeout(() => {
+    if (window.electronAPI) {
+        // В Electron автообновление запускается само через autoUpdater
+        console.log('Electron auto-updater active');
+    } else {
+        // Для браузера — проверка через API
+        fetch(`${API_URL}/api/check_version`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.version && data.version !== currentVersion) {
+                    showUpdateModal(data);
+                }
+            })
+            .catch(console.error);
+    }
+}, 3000);
+        
+        // ========== ОБНОВЛЕНИЕ ЧЕРЕЗ ELECTRON ==========
+if (window.electronAPI) {
+    // Подписываемся на события обновления
+    window.electronAPI.onUpdateAvailable((info) => {
+        showModal(`Доступна версия ${info.version}. Обновление загружается...`);
+    });
+    
+    window.electronAPI.onUpdateDownloaded((info) => {
+        showConfirmModal(`Обновление ${info.version} загружено. Перезапустить для установки?`, () => {
+            window.electronAPI.restart();
+        });
+    });
+}
     </script>
 </body>
 </html>
