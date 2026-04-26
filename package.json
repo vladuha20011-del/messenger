@@ -23,7 +23,7 @@
     "productName": "Enigma Messenger",
     "publish": {
       "provider": "github",
-      "owner": "ТВОЙ_GITHUB_ЛОГИН",
+      "owner": "vladuha20011-del",
       "repo": "enigma-desktop",
       "releaseType": "release"
     },
