@@ -1,4 +1,3 @@
-<!-- client/index.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -56,7 +55,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .message.sent { align-self: flex-end; }
         .message.received { align-self: flex-start; }
-        .message-bubble { padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; position: relative; }
+        .message-bubble { padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
         .message.sent .message-bubble { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-bottom-right-radius: 4px; }
         .message.received .message-bubble { background: #fff; color: #333; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .message-status { font-size: 10px; margin-left: 8px; display: inline-flex; align-items: center; gap: 2px; }
@@ -239,8 +238,8 @@
             <div class="help-section">
                 <div class="setting-item"><button onclick="openHelp()">❓ Помощь</button></div>
             </div>
-            <button onclick="saveSettings()">Сохранить</button>
-            <button onclick="closeSettings()" class="secondary">Закрыть</button>
+            <button onclick="saveSettings()">Сохранить
+                        <button onclick="closeSettings()" class="secondary">Закрыть</button>
         </div>
     </div>
 
@@ -446,14 +445,14 @@
             <h2>👥 Управление группой</h2>
             <div class="setting-item">
                 <label>Название группы</label>
-                <input type="text" id="editGroupName" placeholder="Название группы">
-                <button onclick="renameGroup()" class="btn-primary" style="margin-top: 5px;">Переименовать</button>
+                <input type="text" id="editGroupName" placeholder="Название группы" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                <button onclick="renameGroup()" class="btn-primary" style="width: auto; padding: 6px 12px;">Переименовать</button>
             </div>
             <div class="setting-item">
                 <label>Добавить участника</label>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="addGroupMemberInput" placeholder="Юзернейм" style="flex: 1;">
-                    <button onclick="addGroupMember()" class="btn-primary">➕ Добавить</button>
+                    <input type="text" id="addGroupMemberInput" placeholder="Юзернейм" style="flex: 1; padding: 8px;">
+                    <button onclick="addGroupMember()" class="btn-primary" style="width: auto; padding: 6px 12px;">➕ Добавить</button>
                 </div>
             </div>
             <div class="setting-item">
@@ -464,8 +463,19 @@
         </div>
     </div>
 
+    <div id="updateModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>🔄 Доступно обновление!</h2>
+            <p id="updateMessage"></p>
+            <div class="flex-buttons" style="margin-top: 20px;">
+                <button id="updateNowBtn" class="action-btn btn-primary">✅ Обновить сейчас</button>
+                <button id="updateLaterBtn" class="action-btn secondary">🔔 Напомнить позже</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const API_URL = 'http://localhost:8080';
+        const API_URL = 'http://186.246.2.145:8080';
         let ws = null;
         let currentUser = null;
         let currentChat = null;
@@ -484,7 +494,24 @@
         let currentFilterType = null;
         let currentFilterTitle = null;
         
-        // Для контекстного меню
+        // Автообновление
+        let currentVersion = "1.0.0";
+        
+        function showUpdateModal(updateData) {
+            const modal = document.getElementById('updateModal');
+            const message = document.getElementById('updateMessage');
+            message.innerHTML = `Версия ${updateData.version} уже доступна!<br>${updateData.release_notes || ''}<br><br>Хотите обновиться?`;
+            modal.style.display = 'flex';
+            document.getElementById('updateNowBtn').onclick = () => {
+                window.open(updateData.download_url, '_blank');
+                modal.style.display = 'none';
+            };
+            document.getElementById('updateLaterBtn').onclick = () => {
+                modal.style.display = 'none';
+            };
+        }
+        
+        // Функции контекстного меню и другие вспомогательные функции
         let contextMenu = null;
         let currentMessageId = null;
         let currentMessageText = null;
@@ -887,99 +914,167 @@ function connectWebSocket() {
     ws.onopen = () => console.log('WebSocket connected');
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        if (data.type === 'new_message') {
-            if (data.is_group) {
-                const groupId = data.group_id;
-                if (!messages[groupId]) messages[groupId] = [];
-                messages[groupId].push({
-                    id: data.id,
-                    text: data.text,
-                    time: new Date(data.timestamp).toLocaleTimeString(),
-                    isMe: data.from === currentUser,
-                    delivered: true,
-                    read: false,
-                    file_type: data.file_type,
-                    file_data: data.file_data
-                });
-                if (!chats[groupId]) {
-                    chats[groupId] = {
-                        username: groupId,
-                        lastMessage: data.text.substring(0, 50),
-                        avatar: '',
-                        unread: 1,
-                        isGroup: true
-                    };
-                } else {
-                    chats[groupId].lastMessage = data.text.substring(0, 50);
-                    chats[groupId].unread = (chats[groupId].unread || 0) + 1;
-                }
-                if (currentChat === groupId) {
-                    renderMessages();
-                    if (chats[groupId]) chats[groupId].unread = 0;
-                }
-                renderChats();
-                return;
+        console.log('WebSocket message:', data);
+        
+if (data.type === 'new_message') {
+    // Групповое сообщение
+    if (data.is_group) {
+        const groupId = data.group_id;
+        
+        // Инициализируем массив сообщений для группы, если его нет
+        if (!messages[groupId]) messages[groupId] = [];
+        
+        // Добавляем сообщение в массив (ДАЖЕ если чат не открыт!)
+        messages[groupId].push({
+            id: data.id,
+            text: data.text,
+            time: new Date(data.timestamp).toLocaleTimeString(),
+            isMe: data.from === currentUser,
+            delivered: true,
+            read: false,
+            file_type: data.file_type,
+            file_data: data.file_data,
+            from: data.from
+        });
+        
+        // Обновляем или создаем запись в списке чатов
+        if (!chats[groupId]) {
+            // Если группа ещё не в списке чатов, получаем её название из groups
+            const groupName = groups[groupId]?.name || 'Группа';
+            chats[groupId] = {
+                username: groupName,
+                lastMessage: data.text.substring(0, 50),
+                avatar: '',
+                unread: 1,
+                isGroup: true,
+                groupId: groupId
+            };
+        } else {
+            chats[groupId].lastMessage = data.text.substring(0, 50);
+            chats[groupId].unread = (chats[groupId].unread || 0) + 1;
+        }
+        
+        // Если этот групповой чат открыт в данный момент, перерисовываем сообщения и сбрасываем unread
+        if (currentChat === groupId) {
+            renderMessages();
+            if (chats[groupId]) chats[groupId].unread = 0;
+        }
+        
+        renderChats();
+        return;
+    }
+    
+    // Обычное сообщение (личное) - твой существующий код
+    const sender = data.from === 'System Support' ? '🛡️ Уведомления' : data.from;
+    if (!messages[sender]) messages[sender] = [];
+    messages[sender].push({
+        id: data.id,
+        text: data.text,
+        time: new Date(data.timestamp).toLocaleTimeString(),
+        isMe: false,
+        delivered: true,
+        read: false,
+        file_type: data.file_type,
+        file_data: data.file_data
+    });
+    if (!chats[sender]) {
+        chats[sender] = {
+            username: sender,
+            lastMessage: data.text.substring(0, 50),
+            avatar: '',
+            unread: 1
+        };
+    } else {
+        chats[sender].lastMessage = data.text.substring(0, 50);
+        chats[sender].unread = (chats[sender].unread || 0) + 1;
+    }
+    if (currentChat === sender) {
+        renderMessages();
+        if (chats[sender]) chats[sender].unread = 0;
+    }
+    renderChats();
+} else if (data.type === 'message_read') {
+            for (let chat in messages) {
+                const msg = messages[chat].find(m => m.id === data.message_id);
+                if (msg) msg.read = true;
             }
-            
-            const sender = data.from === 'System Support' ? '🛡️ Уведомления' : data.from;
-            if (!messages[sender]) messages[sender] = [];
-            messages[sender].push({
-                id: data.id,
-                text: data.text,
-                time: new Date(data.timestamp).toLocaleTimeString(),
-                isMe: false,
-                delivered: true,
-                read: false,
-                file_type: data.file_type,
-                file_data: data.file_data
-            });
-            if (!chats[sender]) {
-                chats[sender] = {
-                    username: sender,
-                    lastMessage: data.text.substring(0, 50),
-                    avatar: '',
-                    unread: 1
-                };
-            } else {
-                chats[sender].lastMessage = data.text.substring(0, 50);
-                chats[sender].unread = (chats[sender].unread || 0) + 1;
-            }
-            if (currentChat === sender) {
-                renderMessages();
-                if (chats[sender]) chats[sender].unread = 0;
-            }
+            if (currentChat) renderMessages();
+        } else if (data.type === 'avatar_updated') {
+            if (chats[data.username]) chats[data.username].avatar = data.avatar;
             renderChats();
+            if (currentChat === data.username) updateChatHeader(data.username);
+        } else if (data.type === 'verification_changed') {
+            if (data.is_verified) document.getElementById('menuVerifiedBadge').innerHTML = '✅';
+            else document.getElementById('menuVerifiedBadge').innerHTML = '';
+            renderChats();
+        } else if (data.type === 'profile_updated') {
+            userData.display_name = data.display_name;
+            document.getElementById('menuDisplayName').innerHTML = data.display_name;
+        } else if (data.type === 'ticket_reply') {
+            showModal(`Новый ответ в обращении ${data.ticket_id}`);
+        } else if (data.type === 'show_rating') {
+            pendingTicketId = data.ticket_id;
+            document.getElementById('ratingModal').style.display = 'flex';
+        } else if (data.type === 'warning_issued') {
+            showModal(data.message);
+        } else if (data.type === 'account_deactivated') {
+            showModal(data.message);
+            showDeactivatedModal(data.reason);
+        } else if (data.type === 'account_deleted') {
+            showModal(data.message);
+        } else if (data.type === 'account_restored') {
+            showModal('Ваш аккаунт восстановлен!');
+            location.reload();
         }
     };
     ws.onclose = () => setTimeout(connectWebSocket, 3000);
 }
-        
+
         async function loadChats() {
             const response = await fetch(`${API_URL}/api/contacts/${currentUser}`);
             const data = await response.json();
             data.contacts.forEach(contact => {
                 if (contact.username !== 'System Support' && !chats[contact.username]) {
-                    chats[contact.username] = { username: contact.username, display_name: contact.display_name, avatar: contact.avatar, is_verified: contact.is_verified, lastMessage: '', unread: 0 };
+                    chats[contact.username] = {
+                        username: contact.username,
+                        display_name: contact.display_name,
+                        avatar: contact.avatar,
+                        is_verified: contact.is_verified,
+                        lastMessage: '',
+                        unread: 0
+                    };
                 }
             });
             renderChats();
         }
         
-        async function loadGroups() {
-            const response = await fetch(`${API_URL}/api/groups`);
-            const data = await response.json();
-            groups = {};
-            data.forEach(g => { 
-                groups[g.id] = g; 
-                const members = JSON.parse(g.members || '[]');
-                if (members.includes(currentUser) && !chats[g.id]) {
-                    chats[g.id] = { username: g.name, lastMessage: '', isGroup: true, groupId: g.id, unread: 0 };
-                } else if (chats[g.id]) {
-                    chats[g.id].username = g.name;
-                }
-            });
-            renderChats();
+async function loadGroups() {
+    const response = await fetch(`${API_URL}/api/groups`);
+    const data = await response.json();
+    groups = {};
+    data.forEach(g => {
+        groups[g.id] = g;
+        const members = JSON.parse(g.members || '[]');
+        // Показываем группу в чатах только если текущий пользователь в ней
+        if (members.includes(currentUser)) {
+            // Не перезаписываем existing unread count
+            if (!chats[g.id]) {
+                chats[g.id] = {
+                    username: g.name,
+                    lastMessage: '',
+                    isGroup: true,
+                    groupId: g.id,
+                    avatar: '',
+                    unread: 0
+                };
+            } else {
+                // Обновляем название, если оно изменилось
+                chats[g.id].username = g.name;
+            }
         }
+    });
+    renderChats();
+}
         
         function addSystemChats() {
             if (!chats['⭐ Избранное']) chats['⭐ Избранное'] = { username: '⭐ Избранное', lastMessage: 'Заметки для себя', unread: 0 };
@@ -995,12 +1090,14 @@ function connectWebSocket() {
             const search = document.getElementById('searchInput').value.toLowerCase();
             const filtered = Object.values(chats).filter(chat => chat.username.toLowerCase().includes(search));
             container.innerHTML = filtered.map(chat => {
-                const avatarHtml = chat.avatar ? `<img src="${chat.avatar}">` : `<span>${chat.username.charAt(0).toUpperCase()}</span>`;
+                const isGroup = chat.isGroup;
+                const avatarHtml = chat.avatar ? `<img src="${chat.avatar}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">` : `<span>${chat.username.charAt(0).toUpperCase()}</span>`;
                 const unreadBadge = (chat.unread && chat.unread > 0) ? `<div class="unread-badge">${chat.unread > 99 ? '99+' : chat.unread}</div>` : '';
+                const displayName = isGroup ? `📢 ${chat.username}` : chat.username;
                 return `<div class="chat-item ${currentChat === (chat.groupId || chat.username) ? 'active' : ''}" onclick="selectChat('${chat.groupId || chat.username}')">
                     <div class="chat-avatar" style="position: relative;">${avatarHtml}${unreadBadge}</div>
                     <div class="chat-info">
-                        <div class="chat-display-name">${chat.username}${chat.is_verified ? ' ✅' : ''}</div>
+                        <div class="chat-display-name">${displayName}${chat.is_verified && !isGroup ? ' ✅' : ''}</div>
                         <div class="chat-preview">${escapeHtml(chat.lastMessage || 'Нажмите для чата')}</div>
                     </div>
                 </div>`;
@@ -1018,6 +1115,303 @@ function connectWebSocket() {
             document.getElementById('chatHeaderAvatar').style.display = user.avatar ? 'block' : 'none';
             document.getElementById('chatHeaderName').innerHTML = user.display_name || username;
             document.getElementById('chatHeaderStatus').innerHTML = status.online ? '🟢 Онлайн' : `🟤 Был(а) ${new Date(status.last_seen).toLocaleString()}`;
+        }
+        
+        async function openUserProfile() {
+            if (!currentChatUserId) return;
+            
+            const userResponse = await fetch(`${API_URL}/api/user_full_info/${currentChatUserId}`);
+            const user = await userResponse.json();
+            const statusResponse = await fetch(`${API_URL}/api/user_status/${currentChatUserId}`);
+            const status = await statusResponse.json();
+            const blockedResponse = await fetch(`${API_URL}/api/is_blocked/${currentUser}?target=${currentChatUserId}`);
+            const blockedData = await blockedResponse.json();
+            const isBlockedByMe = blockedData.is_blocked;
+            
+            const statusText = status.online ? '🟢 Онлайн' : `🟤 Был(а) ${new Date(status.last_seen).toLocaleString()}`;
+            const blockButton = isBlockedByMe 
+                ? `<button onclick="unblockUser()" class="action-btn btn-success" style="margin-top:10px;">🔓 Разблокировать</button>`
+                : `<button onclick="blockUser()" class="action-btn btn-danger" style="margin-top:10px;">🚫 Заблокировать</button>`;
+            
+            document.getElementById('userProfileContent').innerHTML = `
+                <div style="text-align: center;">
+                    <img src="${user.avatar || ''}" class="chat-info-avatar" onerror="this.style.display='none'" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 15px;">
+                    <h3>${escapeHtml(user.display_name || currentChatUserId)}</h3>
+                    <p style="color: #888;">@${currentChatUserId}</p>
+                    <p>${statusText}</p>
+                    ${blockButton}
+                </div>
+            `;
+            document.getElementById('userProfileModal').style.display = 'flex';
+        }
+        
+        function closeUserProfileModal() {
+            document.getElementById('userProfileModal').style.display = 'none';
+        }
+        
+        async function blockUser() {
+            await fetch(`${API_URL}/api/block_user`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, block_user: currentChatUserId })
+            });
+            showModal(`Пользователь ${currentChatUserId} заблокирован`);
+            closeUserProfileModal();
+            await checkBlockedStatus();
+            await loadMessages(currentChat);
+        }
+        
+        async function unblockUser() {
+            await fetch(`${API_URL}/api/unblock_user`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, unblock_user: currentChatUserId })
+            });
+            showModal(`Пользователь ${currentChatUserId} разблокирован`);
+            closeUserProfileModal();
+            await checkBlockedStatus();
+            await loadMessages(currentChat);
+        }
+        
+        async function checkBlockedStatus() {
+            const response = await fetch(`${API_URL}/api/is_blocked/${currentUser}?target=${currentChatUserId}`);
+            const data = await response.json();
+            isBlocked = data.is_blocked;
+            
+            const blockedByResponse = await fetch(`${API_URL}/api/is_blocked/${currentChatUserId}?target=${currentUser}`);
+            const blockedByData = await blockedByResponse.json();
+            
+            const inputArea = document.getElementById('inputArea');
+            const blockedMessageDiv = document.getElementById('blockedMessage');
+            
+            if (isBlocked || blockedByData.is_blocked) {
+                inputArea.style.display = 'none';
+                blockedMessageDiv.style.display = 'block';
+                if (isBlocked) {
+                    blockedMessageDiv.innerHTML = '⚠️ Вы не можете написать данному пользователю, так как добавили его в черный список';
+                } else {
+                    blockedMessageDiv.innerHTML = '⚠️ Вы не можете написать данному пользователю, так как вас добавили в черный список';
+                }
+            } else {
+                inputArea.style.display = 'flex';
+                blockedMessageDiv.style.display = 'none';
+            }
+        }
+        
+async function selectChat(chatId) {
+    if (chatId === 'System Support') return;
+    
+    if (chats[chatId]) {
+        chats[chatId].unread = 0;
+        renderChats();
+    }
+    
+    if (chatId === '⭐ Избранное' || chatId === '🛡️ Уведомления') {
+        currentChat = chatId;
+        document.getElementById('chatHeader').style.display = 'none';
+        document.getElementById('inputArea').style.display = chatId === '🛡️ Уведомлений' ? 'none' : 'flex';
+        document.getElementById('chatMenuBtn').style.display = 'flex';
+        if (!messages[chatId]) messages[chatId] = [];
+        renderMessages();
+        renderChats();
+        return;
+    }
+    
+    currentChat = chatId;
+    document.getElementById('chatHeader').style.display = 'flex';
+    document.getElementById('chatMenuBtn').style.display = 'flex';
+    
+    const group = groups[chatId];
+    if (group) {
+        currentChatType = 'group';
+        currentGroupId = chatId;
+        currentChatUserId = null;
+        document.getElementById('chatHeaderName').innerHTML = group.name;
+        const members = JSON.parse(group.members || '[]');
+        document.getElementById('chatHeaderStatus').innerHTML = `👥 ${members.length} участников`;
+        document.getElementById('chatHeaderAvatar').style.display = 'none';
+        document.getElementById('inputArea').style.display = 'flex';
+        document.getElementById('blockedMessage').style.display = 'none';
+        document.getElementById('groupManageItem').style.display = group.owner === currentUser ? 'block' : 'none';
+        document.getElementById('leaveGroupItem').style.display = 'block';
+    } else {
+        currentChatType = 'user';
+        currentChatUserId = chatId;
+        currentGroupId = null;
+        await updateChatHeader(chatId);
+        await checkBlockedStatus();
+        document.getElementById('groupManageItem').style.display = 'none';
+        document.getElementById('leaveGroupItem').style.display = 'none';
+    }
+    
+    // Загружаем сообщения
+    await loadMessages(chatId);
+    
+    // Отмечаем как прочитанные
+    await fetch(`${API_URL}/api/mark_chat_read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser, chat_with: chatId })
+    });
+}
+        
+async function loadMessages(chatId) {
+    console.log('Loading messages for:', chatId);
+    
+    if (!messages[chatId]) messages[chatId] = [];
+    
+    try {
+        let url;
+        // Определяем тип чата
+        const group = groups[chatId];
+        
+        if (group) {
+            // Это группа
+            url = `${API_URL}/api/get_group_messages/${chatId}?user=${currentUser}`;
+        } else if (chatId === '⭐ Избранное' || chatId === '🛡️ Уведомления') {
+            // Избранное и уведомления
+            messages[chatId] = [];
+            renderMessages();
+            renderChats();
+            return;
+        } else {
+            // Личный чат
+            url = `${API_URL}/api/get_messages/${encodeURIComponent(chatId)}?user=${currentUser}`;
+        }
+        
+        const response = await fetch(url);
+        const msgs = await response.json();
+        
+        console.log('Received messages:', msgs);
+        
+        if (msgs && msgs.length > 0) {
+            messages[chatId] = msgs.map(msg => ({
+                id: msg.id,
+                text: msg.message,
+                time: new Date(msg.timestamp).toLocaleTimeString(),
+                isMe: msg.from_user === currentUser,
+                delivered: msg.delivered || true,
+                read: msg.read_status || false,
+                file_type: msg.file_type,
+                file_data: msg.file_data,
+                from: msg.from_user
+            }));
+        } else {
+            messages[chatId] = [];
+        }
+        
+        renderMessages();
+        renderChats();
+        
+    } catch (error) {
+        console.error('Error loading messages:', error);
+        messages[chatId] = [];
+        renderMessages();
+    }
+}
+        
+function renderMessages() {
+    const container = document.getElementById('messagesContainer');
+    if (!currentChat || !messages[currentChat] || messages[currentChat].length === 0) {
+        container.innerHTML = '<div class="no-chat">Нет сообщений</div>';
+        return;
+    }
+    const isGroup = currentChatType === 'group';
+    container.innerHTML = messages[currentChat].map(msg => {
+        const statusHtml = msg.isMe ? `<span class="message-status"><span class="${msg.read ? 'read' : 'delivered'}">${msg.read ? '✓✓' : '✓'}</span></span>` : '';
+        
+        // Для групп показываем имя отправителя (если сообщение не от текущего пользователя)
+        const senderName = (!msg.isMe && isGroup && msg.from) ? `<strong>${escapeHtml(msg.from)}</strong><br>` : '';
+        
+        const content = msg.file_type === 'photo' && msg.file_data 
+            ? `<img src="${msg.file_data}" style="max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer;" onclick="window.open('${msg.file_data}', '_blank')">`
+            : escapeHtml(msg.text);
+            
+        return `<div class="message ${msg.isMe ? 'sent' : 'received'}">
+                    <div class="message-bubble">${senderName}${content}</div>
+                    <div class="message-time">${msg.time}${statusHtml}</div>
+                </div>`;
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+}
+        
+        async function sendMessage() {
+            if (isBlocked && currentChatType === 'user') {
+                showModal('Вы не можете отправить сообщение заблокированному пользователю', true);
+                return;
+            }
+            
+            const input = document.getElementById('messageInput');
+            let text = input.value.trim();
+            if (!text || !currentChat) return;
+            
+            if (editMessageId) {
+                await saveEdit();
+                return;
+            }
+            
+            if (replyToMessageId) {
+                text = `[Ответ на: ${replyToMessageText.substring(0, 50)}] ${text}`;
+            }
+            
+            if (currentChat === '⭐ Избранное') {
+                if (!messages[currentChat]) messages[currentChat] = [];
+                messages[currentChat].push({
+                    text,
+                    time: new Date().toLocaleTimeString(),
+                    isMe: true,
+                    delivered: true,
+                    read: false
+                });
+                renderMessages();
+                input.value = '';
+                cancelReply();
+                const savedNotes = localStorage.getItem(`favorites_${currentUser}`) || '[]';
+                const notes = JSON.parse(savedNotes);
+                notes.push({ text, time: new Date().toISOString() });
+                localStorage.setItem(`favorites_${currentUser}`, JSON.stringify(notes));
+                if (chats[currentChat]) chats[currentChat].lastMessage = text.substring(0, 50);
+                renderChats();
+                return;
+            }
+            
+            if (!messages[currentChat]) messages[currentChat] = [];
+            const tempId = Date.now();
+            messages[currentChat].push({
+                id: tempId,
+                text,
+                time: new Date().toLocaleTimeString(),
+                isMe: true,
+                delivered: false,
+                read: false
+            });
+            renderMessages();
+            input.value = '';
+            
+            const endpoint = currentChatType === 'group' ? '/api/send_group' : '/api/send';
+            const payload = currentChatType === 'group'
+                ? { from: currentUser, group_id: currentChat, text: text }
+                : { from: currentUser, to: currentChat, text: text };
+            
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            
+            if (data.status === 'error') {
+                showModal(data.message, true);
+                messages[currentChat] = messages[currentChat].filter(m => m.id !== tempId);
+                renderMessages();
+                return;
+            }
+            
+            const msg = messages[currentChat].find(m => m.id === tempId);
+            if (msg) msg.delivered = true;
+            renderMessages();
+            
+            if (chats[currentChat]) chats[currentChat].lastMessage = text.substring(0, 50);
+            renderChats();
+            cancelReply();
         }
         
         async function openChatInfo() {
@@ -1110,7 +1504,6 @@ function connectWebSocket() {
         
         function openMessageFromFilter(messageId) {
             closeFilteredItemsModal();
-            // Прокручиваем к сообщению в чате
             const msgElement = document.querySelector(`.message[data-id="${messageId}"]`);
             if (msgElement) {
                 msgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1123,229 +1516,6 @@ function connectWebSocket() {
         
         function closeFilteredItemsModal() {
             document.getElementById('filteredItemsModal').style.display = 'none';
-        }
-        
-        async function openUserProfile() {
-            if (!currentChatUserId) return;
-            
-            const userResponse = await fetch(`${API_URL}/api/user_full_info/${currentChatUserId}`);
-            const user = await userResponse.json();
-            const statusResponse = await fetch(`${API_URL}/api/user_status/${currentChatUserId}`);
-            const status = await statusResponse.json();
-            const blockedResponse = await fetch(`${API_URL}/api/is_blocked/${currentUser}?target=${currentChatUserId}`);
-            const blockedData = await blockedResponse.json();
-            const isBlockedByMe = blockedData.is_blocked;
-            
-            const statusText = status.online ? '🟢 Онлайн' : `🟤 Был(а) ${new Date(status.last_seen).toLocaleString()}`;
-            const blockButton = isBlockedByMe 
-                ? `<button onclick="unblockUser()" class="action-btn btn-success" style="margin-top:10px;">🔓 Разблокировать</button>`
-                : `<button onclick="blockUser()" class="action-btn btn-danger" style="margin-top:10px;">🚫 Заблокировать</button>`;
-            
-            document.getElementById('userProfileContent').innerHTML = `
-                <div style="text-align: center;">
-                    <img src="${user.avatar || ''}" class="chat-info-avatar" onerror="this.style.display='none'" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 15px;">
-                    <h3>${escapeHtml(user.display_name || currentChatUserId)}</h3>
-                    <p style="color: #888;">@${currentChatUserId}</p>
-                    <p>${statusText}</p>
-                    ${blockButton}
-                </div>
-            `;
-            document.getElementById('userProfileModal').style.display = 'flex';
-        }
-        
-        function closeUserProfileModal() {
-            document.getElementById('userProfileModal').style.display = 'none';
-        }
-        
-        async function blockUser() {
-            await fetch(`${API_URL}/api/block_user`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: currentUser, block_user: currentChatUserId })
-            });
-            showModal(`Пользователь ${currentChatUserId} заблокирован`);
-            closeUserProfileModal();
-            await checkBlockedStatus();
-            await loadMessages(currentChat);
-        }
-        
-        async function unblockUser() {
-            await fetch(`${API_URL}/api/unblock_user`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: currentUser, unblock_user: currentChatUserId })
-            });
-            showModal(`Пользователь ${currentChatUserId} разблокирован`);
-            closeUserProfileModal();
-            await checkBlockedStatus();
-            await loadMessages(currentChat);
-        }
-        
-        async function checkBlockedStatus() {
-            const response = await fetch(`${API_URL}/api/is_blocked/${currentUser}?target=${currentChatUserId}`);
-            const data = await response.json();
-            isBlocked = data.is_blocked;
-            
-            const blockedByResponse = await fetch(`${API_URL}/api/is_blocked/${currentChatUserId}?target=${currentUser}`);
-            const blockedByData = await blockedByResponse.json();
-            
-            const inputArea = document.getElementById('inputArea');
-            const blockedMessageDiv = document.getElementById('blockedMessage');
-            
-            if (isBlocked || blockedByData.is_blocked) {
-                inputArea.style.display = 'none';
-                blockedMessageDiv.style.display = 'block';
-                if (isBlocked) {
-                    blockedMessageDiv.innerHTML = '⚠️ Вы не можете написать данному пользователю, так как добавили его в черный список';
-                } else {
-                    blockedMessageDiv.innerHTML = '⚠️ Вы не можете написать данному пользователю, так как вас добавили в черный список';
-                }
-            } else {
-                inputArea.style.display = 'flex';
-                blockedMessageDiv.style.display = 'none';
-            }
-        }
-        
-        async function selectChat(chatId) {
-            if (chatId === 'System Support') return;
-            
-            if (chats[chatId]) {
-                chats[chatId].unread = 0;
-                renderChats();
-            }
-            
-            if (chatId === '⭐ Избранное' || chatId === '🛡️ Уведомления') {
-                currentChat = chatId;
-                document.getElementById('chatHeader').style.display = 'none';
-                document.getElementById('inputArea').style.display = chatId === '🛡️ Уведомления' ? 'none' : 'flex';
-                document.getElementById('chatMenuBtn').style.display = 'flex';
-                if (!messages[chatId]) messages[chatId] = [];
-                renderMessages();
-                renderChats();
-                return;
-            }
-            
-            currentChat = chatId;
-            document.getElementById('chatHeader').style.display = 'flex';
-            document.getElementById('chatMenuBtn').style.display = 'flex';
-            
-            const group = groups[chatId];
-            if (group) {
-                currentChatType = 'group';
-                currentGroupId = chatId;
-                currentChatUserId = null;
-                document.getElementById('chatHeaderName').innerHTML = group.name;
-                const members = JSON.parse(group.members || '[]');
-                document.getElementById('chatHeaderStatus').innerHTML = `👥 ${members.length} участников`;
-                document.getElementById('chatHeaderAvatar').style.display = 'none';
-                document.getElementById('inputArea').style.display = 'flex';
-                document.getElementById('blockedMessage').style.display = 'none';
-                document.getElementById('groupManageItem').style.display = group.owner === currentUser ? 'block' : 'none';
-                document.getElementById('leaveGroupItem').style.display = 'block';
-            } else {
-                currentChatType = 'user';
-                currentChatUserId = chatId;
-                currentGroupId = null;
-                await updateChatHeader(chatId);
-                await checkBlockedStatus();
-                document.getElementById('groupManageItem').style.display = 'none';
-                document.getElementById('leaveGroupItem').style.display = 'none';
-            }
-            
-            await loadMessages(chatId);
-            await fetch(`${API_URL}/api/mark_chat_read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, chat_with: chatId }) });
-        }
-        
-        async function loadMessages(chatId) {
-            if (!messages[chatId]) messages[chatId] = [];
-            const response = await fetch(`${API_URL}/api/get_messages/${encodeURIComponent(chatId)}?user=${currentUser}`);
-            const msgs = await response.json();
-            messages[chatId] = msgs.map(msg => ({ id: msg.id, text: msg.message, time: new Date(msg.timestamp).toLocaleTimeString(), isMe: msg.from_user === currentUser, delivered: msg.delivered, read: msg.read_status, file_type: msg.file_type, file_data: msg.file_data }));
-            renderMessages();
-            renderChats();
-        }
-        
-        function renderMessages() {
-            const container = document.getElementById('messagesContainer');
-            if (!currentChat || !messages[currentChat] || messages[currentChat].length === 0) { container.innerHTML = '<div class="no-chat">Нет сообщений</div>'; return; }
-            container.innerHTML = messages[currentChat].map(msg => {
-                const statusHtml = msg.isMe ? `<span class="message-status"><span class="${msg.read ? 'read' : 'delivered'}">${msg.read ? '✓✓' : '✓'}</span></span>` : '';
-                const isPinned = pinnedMessage && pinnedMessage.id === msg.id;
-                const pinIcon = isPinned ? '📌 ' : '';
-                let content = '';
-                if (msg.file_type === 'photo' && msg.file_data) {
-                    content = `<img src="${msg.file_data}" style="max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer;" onclick="window.open('${msg.file_data}', '_blank')">`;
-                } else {
-                    content = escapeHtml(msg.text);
-                }
-                return `<div class="message ${msg.isMe ? 'sent' : 'received'}" data-id="${msg.id}" data-text="${escapeHtml(msg.text).replace(/`/g, '\\`')}" data-isme="${msg.isMe}" oncontextmenu="showContextMenu(event, ${msg.id}, \`${escapeHtml(msg.text).replace(/`/g, '\\`')}\`, ${msg.isMe})">
-                    <div class="message-bubble">${pinIcon}${content}</div>
-                    <div class="message-time">${msg.time}${statusHtml}</div>
-                </div>`;
-            }).join('');
-            container.scrollTop = container.scrollHeight;
-        }
-        
-        async function sendMessage() {
-            if (isBlocked && currentChatType === 'user') {
-                showModal('Вы не можете отправить сообщение заблокированному пользователю', true);
-                return;
-            }
-            
-            const input = document.getElementById('messageInput');
-            let text = input.value.trim();
-            if (!text || !currentChat) return;
-            
-            if (editMessageId) {
-                await saveEdit();
-                return;
-            }
-            
-            if (replyToMessageId) {
-                text = `[Ответ на: ${replyToMessageText.substring(0, 50)}] ${text}`;
-            }
-            
-            if (currentChat === '⭐ Избранное') {
-                if (!messages[currentChat]) messages[currentChat] = [];
-                messages[currentChat].push({ text, time: new Date().toLocaleTimeString(), isMe: true, delivered: true, read: false });
-                renderMessages();
-                input.value = '';
-                cancelReply();
-                const savedNotes = localStorage.getItem(`favorites_${currentUser}`) || '[]';
-                const notes = JSON.parse(savedNotes);
-                notes.push({ text, time: new Date().toISOString() });
-                localStorage.setItem(`favorites_${currentUser}`, JSON.stringify(notes));
-                if (chats[currentChat]) chats[currentChat].lastMessage = text.substring(0, 50);
-                renderChats();
-                return;
-            }
-            
-            if (!messages[currentChat]) messages[currentChat] = [];
-            const tempId = Date.now();
-            messages[currentChat].push({ id: tempId, text, time: new Date().toLocaleTimeString(), isMe: true, delivered: false, read: false });
-            renderMessages();
-            input.value = '';
-            
-            const endpoint = currentChatType === 'group' ? '/api/send_group' : '/api/send';
-            const payload = currentChatType === 'group' 
-                ? { from: currentUser, group_id: currentChat, text: text }
-                : { from: currentUser, to: currentChat, text: text };
-            
-            const response = await fetch(`${API_URL}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const data = await response.json();
-            
-            if (data.status === 'error') {
-                showModal(data.message, true);
-                messages[currentChat] = messages[currentChat].filter(m => m.id !== tempId);
-                renderMessages();
-                return;
-            }
-            
-            const msg = messages[currentChat].find(m => m.id === tempId);
-            if (msg) msg.delivered = true;
-            renderMessages();
-            
-            if (chats[currentChat]) chats[currentChat].lastMessage = text.substring(0, 50);
-            renderChats();
-            cancelReply();
         }
         
         async function addToGroup() {
@@ -1394,7 +1564,10 @@ function connectWebSocket() {
                 reader.onload = async (ev) => {
                     const avatar = ev.target.result;
                     document.getElementById('profileAvatarPreview').innerHTML = `<img src="${avatar}">`;
-                    await fetch(`${API_URL}/api/update_avatar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, avatar }) });
+                    await fetch(`${API_URL}/api/update_avatar`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: currentUser, avatar })
+                    });
                     userData.avatar = avatar;
                     updateMenuAvatar();
                     showModal('Аватар обновлён');
@@ -1407,7 +1580,10 @@ function connectWebSocket() {
             const displayName = document.getElementById('profileDisplayName').value;
             const phone = document.getElementById('profilePhone').value;
             const birthDate = document.getElementById('profileBirthDate').value;
-            await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, display_name: displayName, phone, birth_date: birthDate }) });
+            await fetch(`${API_URL}/api/profile`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, display_name: displayName, phone, birth_date: birthDate })
+            });
             userData.display_name = displayName;
             document.getElementById('menuDisplayName').innerHTML = displayName;
             showModal('Профиль обновлён');
@@ -1418,7 +1594,10 @@ function connectWebSocket() {
         function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
         async function saveSettings() {
             const language = document.getElementById('settingsLanguage').value;
-            await fetch(`${API_URL}/api/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, language }) });
+            await fetch(`${API_URL}/api/settings`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, language })
+            });
             showModal('Настройки сохранены');
             closeSettings();
         }
@@ -1430,7 +1609,12 @@ function connectWebSocket() {
         async function loadArchivedTickets() {
             const response = await fetch(`${API_URL}/api/tickets/${currentUser}?archived=1`);
             const tickets = await response.json();
-            document.getElementById('archivedTicketsList').innerHTML = tickets.map(t => `<div class="ticket-item" onclick="viewTicket('${t.id}')"><div><strong>${t.id}</strong> - ${t.title}</div><div><small>${t.created_at}</small></div></div>`).join('');
+            document.getElementById('archivedTicketsList').innerHTML = tickets.map(t => `
+                <div class="ticket-item" onclick="viewTicket('${t.id}')">
+                    <div><strong>${t.id}</strong> - ${t.title}</div>
+                    <div><small>${t.created_at}</small></div>
+                </div>
+            `).join('');
         }
         function closeArchivedTickets() { document.getElementById('archivedTicketsModal').style.display = 'none'; }
         
@@ -1443,7 +1627,10 @@ function connectWebSocket() {
         }
         async function savePersonalization() {
             const notifications = document.getElementById('notificationsCheckbox').checked ? 1 : 0;
-            await fetch(`${API_URL}/api/personalization`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, font_scale: currentFontScale, notifications_enabled: notifications }) });
+            await fetch(`${API_URL}/api/personalization`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, font_scale: currentFontScale, notifications_enabled: notifications })
+            });
             showModal('Сохранено');
             closePersonalizationModal();
         }
@@ -1452,7 +1639,10 @@ function connectWebSocket() {
         function closePrivacyModal() { document.getElementById('privacyModal').style.display = 'none'; }
         async function savePrivacy() {
             const privacyLastSeen = document.getElementById('privacyLastSeen').value;
-            await fetch(`${API_URL}/api/privacy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, privacy_last_seen: privacyLastSeen, privacy_exceptions: '[]' }) });
+            await fetch(`${API_URL}/api/privacy`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, privacy_last_seen: privacyLastSeen, privacy_exceptions: '[]' })
+            });
             showModal('Сохранено');
             closePrivacyModal();
         }
@@ -1463,8 +1653,14 @@ function connectWebSocket() {
             const oldPassword = document.getElementById('oldPassword').value;
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
-            if (newPassword !== confirmPassword) { document.getElementById('changePasswordError').innerText = 'Пароли не совпадают'; return; }
-            const response = await fetch(`${API_URL}/api/change_password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, old_password: oldPassword, new_password: newPassword }) });
+            if (newPassword !== confirmPassword) {
+                document.getElementById('changePasswordError').innerText = 'Пароли не совпадают';
+                return;
+            }
+            const response = await fetch(`${API_URL}/api/change_password`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, old_password: oldPassword, new_password: newPassword })
+            });
             const data = await response.json();
             if (data.status === 'success') { showModal('Пароль изменён'); closeChangePasswordModal(); }
             else { document.getElementById('changePasswordError').innerText = data.message; }
@@ -1481,7 +1677,12 @@ function connectWebSocket() {
             if (query.length < 1) { document.getElementById('searchResultsList').innerHTML = ''; return; }
             const response = await fetch(`${API_URL}/api/search_users?q=${encodeURIComponent(query)}&current=${currentUser}`);
             const users = await response.json();
-            document.getElementById('searchResultsList').innerHTML = users.map(user => `<div class="user-item" onclick="startChat('${user.username}')"><div><strong>${user.display_name || user.username}</strong><br><small>@${user.username}</small></div><button>Написать</button></div>`).join('');
+            document.getElementById('searchResultsList').innerHTML = users.map(user => `
+                <div class="user-item" onclick="startChat('${user.username}')">
+                    <div><strong>${user.display_name || user.username}</strong><br><small>@${user.username}</small></div>
+                    <button>Написать</button>
+                </div>
+            `).join('');
         });
         async function startChat(username) {
             closeNewChat();
@@ -1496,11 +1697,14 @@ function connectWebSocket() {
             const name = document.getElementById('groupName').value;
             const members = document.getElementById('groupMembers').value;
             if (!name.trim()) { document.getElementById('groupError').innerText = 'Введите название'; return; }
-            const response = await fetch(`${API_URL}/api/group/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, owner: currentUser, members: members.split(',').map(m => m.trim()) }) });
+            const response = await fetch(`${API_URL}/api/group/create`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, owner: currentUser, members: members.split(',').map(m => m.trim()) })
+            });
             const data = await response.json();
-            if (data.status === 'success') { 
-                showModal(`Группа "${name}" создана`); 
-                closeCreateGroup(); 
+            if (data.status === 'success') {
+                showModal(`Группа "${name}" создана`);
+                closeCreateGroup();
                 await loadGroups();
                 if (data.group_id) {
                     selectChat(data.group_id);
@@ -1514,7 +1718,12 @@ function connectWebSocket() {
         async function loadTickets() {
             const response = await fetch(`${API_URL}/api/tickets/${currentUser}?archived=0`);
             const tickets = await response.json();
-            document.getElementById('ticketsList').innerHTML = tickets.map(t => `<div class="ticket-item" onclick="viewTicket('${t.id}')"><div><strong>${t.id}</strong> - ${t.title}</div><div><small>${t.created_at}</small> <span class="ticket-status status-${t.status}">${t.status}</span></div></div>`).join('');
+            document.getElementById('ticketsList').innerHTML = tickets.map(t => `
+                <div class="ticket-item" onclick="viewTicket('${t.id}')">
+                    <div><strong>${t.id}</strong> - ${t.title}</div>
+                    <div><small>${t.created_at}</small> <span class="ticket-status status-${t.status}">${t.status}</span></div>
+                </div>
+            `).join('');
         }
         
         async function viewTicket(ticketId) {
@@ -1599,8 +1808,14 @@ function connectWebSocket() {
         async function createTicket() {
             const title = document.getElementById('ticketTitle').value;
             const message = document.getElementById('ticketMessage').value;
-            if (!title.trim() || !message.trim()) { document.getElementById('ticketError').innerText = 'Заполните поля'; return; }
-            const response = await fetch(`${API_URL}/api/ticket/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from_user: currentUser, title, message }) });
+            if (!title.trim() || !message.trim()) {
+                document.getElementById('ticketError').innerText = 'Заполните поля';
+                return;
+            }
+            const response = await fetch(`${API_URL}/api/ticket/create`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ from_user: currentUser, title, message })
+            });
             const data = await response.json();
             if (data.status === 'success') { showModal(`Обращение ${data.ticket_id} создано`); closeNewTicket(); }
             else { document.getElementById('ticketError').innerText = data.message; }
@@ -1612,14 +1827,17 @@ function connectWebSocket() {
             const bugType = document.getElementById('bugType').value;
             const text = document.getElementById('bugText').value;
             if (!text.trim()) return;
-            await fetch(`${API_URL}/api/bug_report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: currentUser, bug_type: bugType, message: text }) });
+            await fetch(`${API_URL}/api/bug_report`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ from: currentUser, bug_type: bugType, message: text })
+            });
             closeBugReport();
             showModal('Спасибо!');
         }
         
-        function openComplaint() { 
+        function openComplaint() {
             if (!currentChat) return;
-            document.getElementById('complaintModal').style.display = 'flex'; 
+            document.getElementById('complaintModal').style.display = 'flex';
         }
         function closeComplaint() { document.getElementById('complaintModal').style.display = 'none'; }
         async function sendComplaint() {
@@ -1630,13 +1848,16 @@ function connectWebSocket() {
             const type = currentChatType === 'group' ? 'chat' : 'user';
             const target = currentChatType === 'group' ? currentChat : currentChatUserId;
             
-            await fetch(`${API_URL}/api/complaint/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ 
-                from_user: currentUser, 
-                type: type,
-                target_user: target,
-                reason: reason, 
-                details: details 
-            }) });
+            await fetch(`${API_URL}/api/complaint/create`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    from_user: currentUser,
+                    type: type,
+                    target_user: target,
+                    reason: reason,
+                    details: details
+                })
+            });
             showModal('Жалоба отправлена');
             closeComplaint();
             document.getElementById('complaintDetails').value = '';
@@ -1647,12 +1868,27 @@ function connectWebSocket() {
             const rating = document.querySelector('#ratingStars .star.active')?.dataset.value;
             const comment = document.getElementById('ratingComment').value;
             if (!rating) { showModal('Поставьте оценку', true); return; }
-            fetch(`${API_URL}/api/rate_support`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: pendingTicketId, rating: parseInt(rating), comment, rated_by: currentUser }) });
+            fetch(`${API_URL}/api/rate_support`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket_id: pendingTicketId, rating: parseInt(rating), comment, rated_by: currentUser })
+            });
             closeRating();
             showModal('Спасибо за оценку!');
         }
-        function closeRating() { document.getElementById('ratingModal').style.display = 'none'; document.getElementById('ratingComment').value = ''; document.querySelectorAll('#ratingStars .star').forEach(s => s.classList.remove('active')); }
-        document.querySelectorAll('#ratingStars .star').forEach(star => { star.addEventListener('click', () => { const val = star.dataset.value; document.querySelectorAll('#ratingStars .star').forEach(s => { if (parseInt(s.dataset.value) <= parseInt(val)) s.classList.add('active'); else s.classList.remove('active'); }); }); });
+        function closeRating() {
+            document.getElementById('ratingModal').style.display = 'none';
+            document.getElementById('ratingComment').value = '';
+            document.querySelectorAll('#ratingStars .star').forEach(s => s.classList.remove('active'));
+        }
+        document.querySelectorAll('#ratingStars .star').forEach(star => {
+            star.addEventListener('click', () => {
+                const val = star.dataset.value;
+                document.querySelectorAll('#ratingStars .star').forEach(s => {
+                    if (parseInt(s.dataset.value) <= parseInt(val)) s.classList.add('active');
+                    else s.classList.remove('active');
+                });
+            });
+        });
         
         async function clearChatHistory() {
             showConfirmModal('Очистить историю чата?', async () => {
@@ -1681,13 +1917,17 @@ function connectWebSocket() {
             menu.style.position = 'fixed';
             menu.style.top = (btnRect.bottom + 5) + 'px';
             menu.style.right = (window.innerWidth - btnRect.right) + 'px';
-            document.addEventListener('click', function closeMenu(e) { if (!menu.contains(e.target) && e.target.id !== 'chatMenuBtn') { menu.style.display = 'none'; document.removeEventListener('click', closeMenu); } });
+            document.addEventListener('click', function closeMenu(e) {
+                if (!menu.contains(e.target) && e.target.id !== 'chatMenuBtn') {
+                    menu.style.display = 'none';
+                    document.removeEventListener('click', closeMenu);
+                }
+            });
         }
         
         function logout() { if (ws) ws.close(); location.reload(); }
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
         
-        // Выход из чата по Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && currentChat) {
                 currentChat = null;
@@ -1702,7 +1942,6 @@ function connectWebSocket() {
         document.getElementById('searchInput').addEventListener('input', () => renderChats());
         document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
         
-        // Глобальные функции
         window.selectChat = selectChat;
         window.openChatInfo = openChatInfo;
         window.addToGroup = addToGroup;
