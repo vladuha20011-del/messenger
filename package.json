@@ -6,8 +6,7 @@
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "publish": "electron-builder --win --publish always"
   },
   "author": "Enigma Team",
   "license": "MIT",
@@ -24,7 +23,7 @@
     "publish": {
       "provider": "github",
       "owner": "vladuha20011-del",
-      "repo": "enigma-desktop",
+      "repo": "messenger",
       "releaseType": "release"
     },
     "win": {
